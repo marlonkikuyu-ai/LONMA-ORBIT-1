@@ -2,9 +2,10 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+import os
 
 from core.config import settings
-from database import engine, Base, get_db
+from database import engine, Base, get_db # import from database.py
 
 from modules.auth import routes as auth_routes
 from modules.user import routes as user_routes
@@ -21,16 +22,14 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
 
-# CORS - fix: [""] will block everything. Use "*" for now or your frontend URL
 app.add_middleware(
     CORSMiddleware, 
-    allow_origins=["*"], # change to ["https://yourdomain.com"] later
+    allow_origins=["*"], 
     allow_credentials=True, 
     allow_methods=["*"], 
     allow_headers=["*"]
 )
 
-# Routers
 app.include_router(auth_routes.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(user_routes.router, prefix="/api/user", tags=["User"])
 app.include_router(supermarket_routes.router, prefix="/api/supermarket", tags=["Supermarket"])
@@ -40,7 +39,6 @@ app.include_router(order_routes.router, prefix="/api/order", tags=["Order"])
 app.include_router(delivery_routes.router, prefix="/api/delivery", tags=["Delivery"])
 app.include_router(payment_routes.router, prefix="/api/payment", tags=["Payment"])
 app.include_router(admin_routes.router, prefix="/api/admin", tags=["Admin"])
-
 
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
