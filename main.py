@@ -1,11 +1,25 @@
-# main.py
+import os
+import sys
+import traceback
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-import os
+
+print("=== STARTING APP DEBUG ===")
+print("DATABASE_URL set:", "YES" if os.getenv("DATABASE_URL") else "NO")
+print("PORT:", os.getenv("PORT"))
+
+try:
+    from database import engine, Base, get_db
+    print("Importing database.py: OK")
+    Base.metadata.create_all(bind=engine)
+    print("DB Tables created: OK")
+except Exception:
+    print("CRASH DURING STARTUP:")
+    traceback.print_exc()
+    sys.exit(1)
 
 from core.config import settings
-from database import engine, Base, get_db # import from database.py
 
 from modules.auth import routes as auth_routes
 from modules.user import routes as user_routes
@@ -17,16 +31,13 @@ from modules.delivery import routes as delivery_routes
 from modules.payment import routes as payment_routes
 from modules.admin import routes as admin_routes
 
-# Create tables on startup
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
 
 app.add_middleware(
-    CORSMiddleware, 
-    allow_origins=["*"], 
-    allow_credentials=True, 
-    allow_methods=["*"], 
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"]
 )
 
@@ -47,3 +58,5 @@ def health(db: Session = Depends(get_db)):
 @app.get("/")
 def read_root():
     return {"message": f"Welcome to {settings.APP_NAME}"}
+
+print("=== STARTING APP DEBUG END ===")
