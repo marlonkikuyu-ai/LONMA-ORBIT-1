@@ -1,25 +1,18 @@
-# database.py
-import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import os
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if DATABASE_URL is None:
-    raise ValueError("DATABASE_URL environment variable is not set")
-
 engine = create_engine(
     DATABASE_URL,
-    pool_size=5,           
-    max_overflow=10,       
-    pool_pre_ping=True,    
-    connect_args={"sslmode": "require"} # Required for Render Postgres
+    connect_args={"sslmode": "require"}  # <-- add this for Render
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Dependency for FastAPI routes
 def get_db():
     db = SessionLocal()
     try:
