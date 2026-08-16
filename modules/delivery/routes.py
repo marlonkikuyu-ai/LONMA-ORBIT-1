@@ -1,28 +1,24 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database import get_db
-from.schemas import OrderCreate, OrderOut, OrderStatusUpdate
-from.service import create_order, get_user_orders, get_order_by_id, update_order_status, get_merchant_orders
+from.schemas import DeliveryZoneCreate, DeliveryZoneOut, DeliveryFeeRequest, DeliveryFeeOut, AssignRiderRequest
+from.service import create_delivery_zone, get_delivery_zones, calculate_delivery_fee, assign_delivery
 from core.security import get_current_user
 
 router = APIRouter()
 
-@router.post("/", response_model=OrderOut)
-def create_new_order(order: OrderCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return create_order(db, user.id, order)
+@router.post("/zones", response_model=DeliveryZoneOut)
+def create_zone(zone: DeliveryZoneCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return create_delivery_zone(db, zone)
 
-@router.get("/me", response_model=list[OrderOut])
-def read_user_orders(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return get_user_orders(db, user.id)
+@router.get("/zones", response_model=list[DeliveryZoneOut])
+def list_zones(db: Session = Depends(get_db)):
+    return get_delivery_zones(db)
 
-@router.get("/{order_id}", response_model=OrderOut)
-def read_order(order_id: int, db: Session = Depends(get_db)):
-    return get_order_by_id(db, order_id)
+@router.post("/fee", response_model=DeliveryFeeOut)
+def get_fee(req: DeliveryFeeRequest, db: Session = Depends(get_db)):
+    return calculate_delivery_fee(db, req.zone_id, req.distance_km)
 
-@router.patch("/{order_id}/status", response_model=OrderOut)
-def update_status(order_id: int, payload: OrderStatusUpdate, db: Session = Depends(get_db)):
-    return update_order_status(db, order_id, payload.status)
-
-@router.get("/merchant/{merchant_id}", response_model=list[OrderOut])
-def read_merchant_orders(merchant_id: int, db: Session = Depends(get_db)):
-    return get_merchant_orders(db, merchant_id)
+@router.post("/assign")
+def assign(req: AssignRiderRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return assign_delivery(db, req)
