@@ -1,27 +1,31 @@
 from pydantic import BaseModel
-from datetime import datetime
+
 class PaymentCreate(BaseModel):
-    order_id: str
+    order_id: int
     amount: float
     method: str
-    phone: str
+
 class PaymentOut(BaseModel):
-    id: str
-    order_id: str
+    id: int
+    order_id: int
     amount: float
     method: str
-    mpesa_code: str | None
+    reference: str
     status: str
-    paid_at: datetime | None
     class Config:
         from_attributes = True
-class PayoutOut(BaseModel):
-    id: str
-    recipient_id: str
-    recipient_type: str
+
+class PayoutCreate(BaseModel):
+    merchant_id: int
     amount: float
+    method: str
+
+class PayoutOut(BaseModel):
+    id: int
+    merchant_id: int
+    amount: float
+    method: str
+    reference: str
     status: str
-    reference: str | None
-    created_at: datetime
     class Config:
         from_attributes = True
