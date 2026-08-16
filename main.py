@@ -22,4 +22,14 @@ async def startup_event():
 def root():
     return {"status": "LONMA ORBIT API is LIVE"}
 
+from modules import auth, user, supermarket, product, order, payment, rider
+
+app.include_router(auth.router, prefix="/auth", tags=["Auth"])
+app.include_router(user.router, prefix="/users", tags=["Users"])
+app.include_router(supermarket.router, prefix="/supermarkets", tags=["Supermarkets"])
+app.include_router(product.router, prefix="/products", tags=["Products"])
+app.include_router(order.router, prefix="/orders", tags=["Orders"])
+app.include_router(payment.router, prefix="/payments", tags=["Payments"])
+app.include_router(rider.router, prefix="/riders", tags=["Riders"])
+
 print("APP STARTED SUCCESSFULLY")
