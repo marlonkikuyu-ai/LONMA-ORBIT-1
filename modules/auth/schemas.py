@@ -1,14 +1,13 @@
 from pydantic import BaseModel, EmailStr
-from datetime import datetime
 
 class UserCreate(BaseModel):
+    email: EmailStr
     phone: str
-    email: EmailStr | None = None
     password: str
-    role: str
+    full_name: str
 
 class UserLogin(BaseModel):
-    phone: str
+    email: EmailStr
     password: str
 
 class Token(BaseModel):
@@ -16,11 +15,11 @@ class Token(BaseModel):
     token_type: str
 
 class UserOut(BaseModel):
-    id: str
+    id: int
+    email: EmailStr
     phone: str
-    email: str | None
-    role: str
+    full_name: str
     is_active: bool
-    created_at: datetime
+    is_admin: bool
     class Config:
         from_attributes = True
