@@ -1,33 +1,23 @@
-from sqlalchemy import Column, String, Float, ForeignKey, DateTime
-import uuid
-from datetime import datetime
-from core.db import Base
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, func
+from database import Base
+from sqlalchemy.orm import relationship
 
 class Order(Base):
-    _tablename_ = "orders"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    customer_id = Column(String, ForeignKey("users.id"), nullable=False)
-    supermarket_id = Column(String, ForeignKey("supermarkets.id"), nullable=False)
-    rider_id = Column(String, ForeignKey("riders.id"), nullable=True)
-    status = Column(String, default="pending")
+    __tablename__ = "orders"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    merchant_id = Column(Integer, ForeignKey("merchants.id"), nullable=False)
     total_amount = Column(Float, nullable=False)
-    delivery_fee = Column(Float, nullable=False)
-    commission = Column(Float, nullable=False)
-    supermarket_payout = Column(Float, nullable=False)
-    payment_status = Column(String, default="unpaid")
-    delivery_address = Column(String, nullable=False)
-    lat = Column(Float, nullable=False)
-    lng = Column(Float, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    packed_at = Column(DateTime, nullable=True)
-    picked_at = Column(DateTime, nullable=True)
-    delivered_at = Column(DateTime, nullable=True)
+    status = Column(String, default="pending")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    items = relationship("OrderItem", back_populates="order")
 
 class OrderItem(Base):
-    _tablename_ = "order_items"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    order_id = Column(String, ForeignKey("orders.id"), nullable=False)
-    product_id = Column(String, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Float, nullable=False)
-    unit_price = Column(Float, nullable=False)
-    total_price = Column(Float, nullable=False)
+    __tablename__ = "order_items"
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    product_id = Column(Integer, nullable=False)
+    product_name = Column(String, nullable=False)
+    quantity = Column(Integer, nullable=False)
+    price = Column(Float, nullable=False)
+    order = relationship("Order", back_populates="items")
