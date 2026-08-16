@@ -1,34 +1,33 @@
 from pydantic import BaseModel
-from datetime import datetime
 
 class ProductCreate(BaseModel):
-    supermarket_id: str
+    merchant_id: int
     name: str
-    category: str
+    description: str
     price: float
-    stock: float
-    unit: str
+    stock: int
+    category: str
     image_url: str | None = None
 
 class ProductUpdate(BaseModel):
     name: str | None = None
-    category: str | None = None
+    description: str | None = None
     price: float | None = None
-    stock: float | None = None
-    unit: str | None = None
+    stock: int | None = None
+    category: str | None = None
     image_url: str | None = None
-    is_active: bool | None = None
+
+class StockUpdate(BaseModel):
+    quantity: int
 
 class ProductOut(BaseModel):
-    id: str
-    supermarket_id: str
+    id: int
+    merchant_id: int
     name: str
-    category: str
+    description: str
     price: float
-    stock: float
-    unit: str
-    image_url: str | None
-    is_active: bool
-    created_at: datetime
+    stock: int
+    category: str
+    image_url: str | None = None
     class Config:
         from_attributes = True
