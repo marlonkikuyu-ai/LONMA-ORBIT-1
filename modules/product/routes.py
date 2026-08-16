@@ -1,46 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from core.db import get_db
-from core.security import require_role
-from modules.product import models, schemas
+from database import get_db
+from.schemas import ProductCreate, ProductOut, ProductUpdate, StockUpdate
+from.service import create_product, get_product, get_merchant_products, update_product, delete_product, update_stock
+from core.security import get_current_user
 
 router = APIRouter()
 
-@router.post("/", response_model=schemas.ProductOut)
-def create_product(product: schemas.ProductCreate, db: Session = Depends(get_db), user = Depends(require_role(["supermarket", "admin"]))):
-    db_p = models.Product(**product.model_dump())
-    db.add(db_p)
-    db.commit()
-    db.refresh(db_p)
-    return db_p
+@router.post("/", response_model=ProductOut)
+def create_new_product(payload: ProductCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return create_product(db, payload)
 
-@router.get("/supermarket/{supermarket_id}", response_model=list[schemas.ProductOut])
-def list_products(supermarket_id: str, db: Session = Depends(get_db)):
-    return db.query(models.Product).filter(models.Product.supermarket_id==supermarket_id, models.Product.is_active==True).all()
+@router.get("/{product_id}", response_model=ProductOut)
+def read_product(product_id: int, db: Session = Depends(get_db)):
+    return get_product(db, product_id)
 
-@router.get("/{product_id}", response_model=schemas.ProductOut)
-def get_product(product_id: str, db: Session = Depends(get_db)):
-    p = db.query(models.Product).filter(models.Product.id==product_id).first()
-    if not p:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return p
+@router.get("/merchant/{merchant_id}", response_model=list[ProductOut])
+def read_merchant_products(merchant_id: int, db: Session = Depends(get_db)):
+    return get_merchant_products(db, merchant_id)
 
-@router.put("/{product_id}", response_model=schemas.ProductOut)
-def update_product(product_id: str, data: schemas.ProductUpdate, db: Session = Depends(get_db), user = Depends(require_role(["supermarket", "admin"]))):
-    p = db.query(models.Product).filter(models.Product.id==product_id).first()
-    if not p:
-        raise HTTPException(status_code=404, detail="Product not found")
-    for k, v in data.model_dump(exclude_unset=True).items():
-        setattr(p, k, v)
-    db.commit()
-    db.refresh(p)
-    return p
+@router.patch("/{product_id}", response_model=ProductOut)
+def update_existing_product(product_id: int, payload: ProductUpdate, db: Session = Depends(get_db)):
+    return update_product(db, product_id, payload)
 
 @router.delete("/{product_id}")
-def delete_product(product_id: str, db: Session = Depends(get_db), user = Depends(require_role(["supermarket", "admin"]))):
-    p = db.query(models.Product).filter(models.Product.id==product_id).first()
-    if not p:
-        raise HTTPException(status_code=404, detail="Product not found")
-    p.is_active = False
-    db.commit()
-    return {"detail": "Product deactivated"}
+def delete_existing_product(product_id: int, db: Session = Depends(get_db)):
+    return delete_product(db, product_id)
+
+@router.patch("/{product_id}/stock", response_model=ProductOut)
+def update_product_stock(product_id: int, payload: StockUpdate, db: Session = Depends(get_db)):
+    return update_stock(db, product_id, payload.quantity)
