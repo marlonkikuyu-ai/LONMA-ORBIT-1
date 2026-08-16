@@ -1,30 +1,34 @@
 from pydantic import BaseModel
+from typing import List
 
-class DeliveryZoneCreate(BaseModel):
-    name: str
-    base_fee: float
-    per_km_fee: float
+class OrderItemCreate(BaseModel):
+    product_id: int
+    product_name: str
+    quantity: int
+    price: float
 
-class DeliveryZoneOut(BaseModel):
+class OrderCreate(BaseModel):
+    merchant_id: int
+    items: List[OrderItemCreate]
+
+class OrderItemOut(BaseModel):
     id: int
-    name: str
-    base_fee: float
-    per_km_fee: float
+    product_id: int
+    product_name: str
+    quantity: int
+    price: float
     class Config:
         from_attributes = True
 
-class DeliveryFeeRequest(BaseModel):
-    zone_id: int
-    distance_km: float
+class OrderOut(BaseModel):
+    id: int
+    user_id: int
+    merchant_id: int
+    total_amount: float
+    status: str
+    items: List[OrderItemOut]
+    class Config:
+        from_attributes = True
 
-class DeliveryFeeOut(BaseModel):
-    fee: float
-    distance_km: float
-
-class AssignRiderRequest(BaseModel):
-    order_id: int
-    pickup_lat: float
-    pickup_lng: float
-    dropoff_lat: float
-    dropoff_lng: float
-    zone_id: int
+class OrderStatusUpdate(BaseModel):
+    status: str
