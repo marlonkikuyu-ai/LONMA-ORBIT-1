@@ -1,16 +1,12 @@
-# core/config.py
+from pydantic_settings import BaseSettings
+from pydantic import EmailStr
 import os
-from pydantic import BaseSettings
-from dotenv import load_dotenv
-
-load_dotenv() # load.env file
 
 class Settings(BaseSettings):
-    APP_NAME: str = "LONMA Orbit"
-    DEBUG: bool = False
-    DATABASE_URL: str = os.getenv("DATABASE_URL")
-    SECRET_KEY: str = os.getenv("SECRET_KEY")
-    # add your other env vars here
+    DATABASE_URL: str
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     class Config:
         env_file = ".env"
