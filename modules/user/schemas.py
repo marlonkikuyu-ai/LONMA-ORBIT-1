@@ -1,26 +1,30 @@
 from pydantic import BaseModel
-from datetime import datetime
 
 class AddressCreate(BaseModel):
     label: str
-    address: str
-    lat: float
-    lng: float
+    address_line: str
+    latitude: float
+    longitude: float
 
 class AddressOut(BaseModel):
-    id: str
-    user_id: str
+    id: int
+    user_id: int
     label: str
-    address: str
-    lat: float
-    lng: float
-    created_at: datetime
+    address_line: str
+    latitude: float
+    longitude: float
     class Config:
         from_attributes = True
 
+class WalletCreate(BaseModel):
+    user_id: int
+
+class TopUpRequest(BaseModel):
+    amount: float
+
 class WalletOut(BaseModel):
-    id: str
-    user_id: str
+    id: int
+    user_id: int
     balance: float
     class Config:
         from_attributes = True
