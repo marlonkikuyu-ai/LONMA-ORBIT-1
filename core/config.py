@@ -1,6 +1,4 @@
 from pydantic_settings import BaseSettings
-from pydantic import EmailStr
-import os
 
 class Settings(BaseSettings):
     DATABASE_URL: str
