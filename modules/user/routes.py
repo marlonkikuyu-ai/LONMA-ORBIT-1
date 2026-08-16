@@ -1,24 +1,28 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from core.db import get_db
+from database import get_db
+from.schemas import AddressCreate, AddressOut, WalletOut, TopUpRequest
+from.service import create_address, get_user_addresses, create_wallet, get_wallet, top_up_wallet
 from core.security import get_current_user
-from modules.user import models, schemas
 
 router = APIRouter()
 
-@router.post("/address", response_model=schemas.AddressOut)
-def add_address(addr: schemas.AddressCreate, db: Session = Depends(get_db), user = Depends(get_current_user)):
-    db_a = models.Address(user_id=user.id, **addr.model_dump())
-    db.add(db_a)
-    db.commit()
-    db.refresh(db_a)
-    return db_a
+@router.post("/address", response_model=AddressOut)
+def add_address(payload: AddressCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return create_address(db, user.id, payload)
 
-@router.get("/addresses", response_model=list[schemas.AddressOut])
-def list_addresses(db: Session = Depends(get_db), user = Depends(get_current_user)):
-    return db.query(models.Address).filter(models.Address.user_id==user.id).all()
+@router.get("/addresses", response_model=list[AddressOut])
+def read_addresses(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return get_user_addresses(db, user.id)
 
-@router.get("/wallet", response_model=schemas.WalletOut)
-def get_wallet(db: Session = Depends(get_db), user = Depends(get_current_user)):
-    wallet = db.query(models.Wallet).filter(models.Wallet.user_id==user.id).first()
-    return wallet
+@router.post("/wallet", response_model=WalletOut)
+def init_wallet(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return create_wallet(db, user.id)
+
+@router.get("/wallet", response_model=WalletOut)
+def read_wallet(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return get_wallet(db, user.id)
+
+@router.post("/wallet/top-up", response_model=WalletOut)
+def top_up(payload: TopUpRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return top_up_wallet(db, user.id, payload.amount)
