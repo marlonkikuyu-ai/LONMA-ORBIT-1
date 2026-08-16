@@ -1,17 +1,27 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from core.db import get_db
-from core.security import require_role
-from modules.order.models import Order
-from modules.auth.models import User
-from modules.supermarket.models import Supermarket
-from modules.admin.schemas import AnalyticsOut
+from database import get_db
+from .service import get_admin_analytics, freeze_user_wallet, unfreeze_user_wallet, approve_merchant
+from .schemas import AnalyticsOut, FreezeWalletRequest, MerchantApprovalRequest
+from core.security import get_current_admin_user
+
 router = APIRouter()
+
 @router.get("/analytics", response_model=AnalyticsOut)
-def analytics(db: Session = Depends(get_db), user = Depends(require_role(["admin"]))):
-    total_orders = db.query(func.count(Order.id)).scalar()
-    total_revenue = db.query(func.sum(Order.total_amount)).scalar() or 0
-    total_customers = db.query(func.count(User.id)).filter(User.role=="customer").scalar()
-    total_supermarkets = db.query(func.count(Supermarket.id)).scalar()
-    return {"total_orders": total_orders, "total_revenue": total_revenue, "total_customers": total_customers, "total_supermarkets": total_supermarkets}
+def read_admin_analytics(db: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
+    return get_admin_analytics(db)
+
+@router.post("/wallet/freeze")
+def freeze_wallet(payload: FreezeWalletRequest, db: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
+    freeze_user_wallet(db, payload.user_id)
+    return {"status": "frozen"}
+
+@router.post("/wallet/unfreeze")
+def unfreeze_wallet(payload: FreezeWalletRequest, db: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
+    unfreeze_user_wallet(db, payload.user_id)
+    return {"status": "unfrozen"}
+
+@router.post("/merchant/approve")
+def approve_merchant_account(payload: MerchantApprovalRequest, db: Session = Depends(get_db), admin=Depends(get_current_admin_user)):
+    approve_merchant(db, payload.merchant_id)
+    return {"status": "approved"}
