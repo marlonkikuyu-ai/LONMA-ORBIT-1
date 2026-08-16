@@ -1,30 +1,32 @@
 from pydantic import BaseModel
-from datetime import datetime
 
 class RiderCreate(BaseModel):
-    name: str
-    phone: str
-    bike_plate: str
+    user_id: int
+    vehicle_type: str
+    vehicle_number: str
+    latitude: float
+    longitude: float
 
-class RiderLocationUpdate(BaseModel):
-    lat: float
-    lng: float
+class RiderUpdate(BaseModel):
+    latitude: float | None = None
+    longitude: float | None = None
+    is_available: bool | None = None
 
-class RiderStatusUpdate(BaseModel):
-    is_online: bool
+class EarningUpdate(BaseModel):
+    amount: float
+
+class RatingUpdate(BaseModel):
+    rating: float
 
 class RiderOut(BaseModel):
-    id: str
-    user_id: str
-    name: str
-    phone: str
-    bike_plate: str
-    lat: float
-    lng: float
-    is_online: bool
-    wallet_balance: float
-    total_deliveries: float
+    id: int
+    user_id: int
+    vehicle_type: str
+    vehicle_number: str
+    latitude: float
+    longitude: float
+    is_available: bool
+    earnings: float
     rating: float
-    created_at: datetime
     class Config:
         from_attributes = True
