@@ -1,46 +1,28 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from core.db import get_db
-from core.security import require_role
-from modules.supermarket import models, schemas
+from database import get_db
+from.schemas import SupermarketCreate, SupermarketOut, SupermarketUpdate
+from.service import create_supermarket, get_supermarket, get_all_supermarkets, update_supermarket, delete_supermarket
+from core.security import get_current_user
 
 router = APIRouter()
 
-@router.post("/", response_model=schemas.SupermarketOut)
-def create_supermarket(supermarket: schemas.SupermarketCreate, db: Session = Depends(get_db), user = Depends(require_role(["admin"]))):
-    db_sm = models.Supermarket(owner_id=user.id, **supermarket.model_dump())
-    db.add(db_sm)
-    db.commit()
-    db.refresh(db_sm)
-    return db_sm
+@router.post("/", response_model=SupermarketOut)
+def create_new_supermarket(payload: SupermarketCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return create_supermarket(db, payload)
 
-@router.get("/", response_model=list[schemas.SupermarketOut])
-def list_supermarkets(db: Session = Depends(get_db)):
-    return db.query(models.Supermarket).filter(models.Supermarket.is_active==True).all()
+@router.get("/{supermarket_id}", response_model=SupermarketOut)
+def read_supermarket(supermarket_id: int, db: Session = Depends(get_db)):
+    return get_supermarket(db, supermarket_id)
 
-@router.get("/{supermarket_id}", response_model=schemas.SupermarketOut)
-def get_supermarket(supermarket_id: str, db: Session = Depends(get_db)):
-    sm = db.query(models.Supermarket).filter(models.Supermarket.id==supermarket_id).first()
-    if not sm:
-        raise HTTPException(status_code=404, detail="Supermarket not found")
-    return sm
+@router.get("/", response_model=list[SupermarketOut])
+def read_all_supermarkets(db: Session = Depends(get_db)):
+    return get_all_supermarkets(db)
 
-@router.put("/{supermarket_id}", response_model=schemas.SupermarketOut)
-def update_supermarket(supermarket_id: str, data: schemas.SupermarketUpdate, db: Session = Depends(get_db), user = Depends(require_role(["admin"]))):
-    sm = db.query(models.Supermarket).filter(models.Supermarket.id==supermarket_id).first()
-    if not sm:
-        raise HTTPException(status_code=404, detail="Supermarket not found")
-    for k, v in data.model_dump(exclude_unset=True).items():
-        setattr(sm, k, v)
-    db.commit()
-    db.refresh(sm)
-    return sm
+@router.patch("/{supermarket_id}", response_model=SupermarketOut)
+def update_existing_supermarket(supermarket_id: int, payload: SupermarketUpdate, db: Session = Depends(get_db)):
+    return update_supermarket(db, supermarket_id, payload)
 
 @router.delete("/{supermarket_id}")
-def delete_supermarket(supermarket_id: str, db: Session = Depends(get_db), user = Depends(require_role(["admin"]))):
-    sm = db.query(models.Supermarket).filter(models.Supermarket.id==supermarket_id).first()
-    if not sm:
-        raise HTTPException(status_code=404, detail="Supermarket not found")
-    sm.is_active = False
-    db.commit()
-    return {"detail": "Supermarket deactivated"}
+def delete_existing_supermarket(supermarket_id: int, db: Session = Depends(get_db)):
+    return delete_supermarket(db, supermarket_id)
