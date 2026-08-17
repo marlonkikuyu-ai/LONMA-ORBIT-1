@@ -1,47 +1,32 @@
 from sqlalchemy.orm import Session
-from.models import Address, Wallet
-from.schemas import AddressCreate, WalletCreate
-from fastapi import HTTPException
+from modules.user import models
+from .schemas import AddressCreate
 
-def create_address(db: Session, user_id: int, address_data: AddressCreate):
-    address = Address(user_id=user_id, label=address_data.label, address_line=address_data.address_line, latitude=address_data.latitude, longitude=address_data.longitude)
-    db.add(address)
+def create_address(db: Session, user_id: int, address: AddressCreate):
+    db_address = models.Address(user_id=user_id, **address.model_dump())
+    db.add(db_address)
     db.commit()
-    db.refresh(address)
-    return address
+    db.refresh(db_address)
+    return db_address
 
 def get_user_addresses(db: Session, user_id: int):
-    return db.query(Address).filter(Address.user_id == user_id).all()
+    return db.query(models.Address).filter(models.Address.user_id == user_id).all()
+
+def get_wallet(db: Session, user_id: int):
+    return db.query(models.Wallet).filter(models.Wallet.user_id == user_id).first()
 
 def create_wallet(db: Session, user_id: int):
-    existing = db.query(Wallet).filter(Wallet.user_id == user_id).first()
-    if existing:
-        return existing
-    wallet = Wallet(user_id=user_id)
+    wallet = models.Wallet(user_id=user_id)
     db.add(wallet)
     db.commit()
     db.refresh(wallet)
     return wallet
 
-def get_wallet(db: Session, user_id: int):
-    return db.query(Wallet).filter(Wallet.user_id == user_id).first()
-
 def top_up_wallet(db: Session, user_id: int, amount: float):
     wallet = get_wallet(db, user_id)
     if not wallet:
         wallet = create_wallet(db, user_id)
-    wallet.balance = wallet.balance + amount
-    db.commit()
-    db.refresh(wallet)
-    return wallet
-
-def deduct_wallet(db: Session, user_id: int, amount: float):
-    wallet = get_wallet(db, user_id)
-    if not wallet:
-        raise HTTPException(status_code=404, detail="Wallet not found")
-    if wallet.balance < amount:
-        raise HTTPException(status_code=400, detail="Insufficient balance")
-    wallet.balance = wallet.balance - amount
+    wallet.balance += amount
     db.commit()
     db.refresh(wallet)
     return wallet
