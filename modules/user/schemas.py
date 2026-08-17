@@ -13,6 +13,9 @@ class AddressOut(AddressCreate):
     created_at: datetime
     class Config: from_attributes = True
 
+class WalletCreate(BaseModel):
+    pass
+
 class WalletOut(BaseModel):
     id: int
     user_id: int
