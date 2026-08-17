@@ -1,30 +1,27 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+from datetime import datetime
 
-class AddressCreate(BaseModel):
-    label: str
-    address_line: str
-    latitude: float
-    longitude: float
+class UserCreate(BaseModel):
+    name: str
+    email: EmailStr
+    phone: str
+    password: str
 
-class AddressOut(BaseModel):
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class UserOut(BaseModel):
     id: int
-    user_id: int
-    label: str
-    address_line: str
-    latitude: float
-    longitude: float
+    name: str
+    email: EmailStr
+    phone: str | None
+    is_active: bool
+    created_at: datetime
+    
     class Config:
         from_attributes = True
 
-class WalletCreate(BaseModel):
-    user_id: int
-
-class TopUpRequest(BaseModel):
-    amount: float
-
-class WalletOut(BaseModel):
-    id: int
-    user_id: int
-    balance: float
-    class Config:
-        from_attributes = True
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
