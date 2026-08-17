@@ -1,16 +1,13 @@
 from fastapi import FastAPI
 from database import init_db
-from modules.auth import routes as auth_routes
-# from modules.user import routes as user_routes # comment this until schemas ready
+from modules.auth import router as auth_router
+from modules.user import router as user_router
 
 app = FastAPI(title="LONMA Orbit API")
 
 @app.on_event("startup")
 def on_startup():
-    init_db() # run after server starts
+    init_db()
 
-app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
-# app.include_router(user_routes.router, prefix="/user", tags=["User"])
-
-@app.get("/health")
-def health(): return {"status": "ok"}
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+app.include_router(user_router, prefix="/user", tags=["User"])
