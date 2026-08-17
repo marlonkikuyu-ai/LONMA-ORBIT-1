@@ -1,28 +1,13 @@
 from fastapi import FastAPI
 from database import Base, engine
-from modules import auth, user, supermarket, product, order, payment, rider
-import os
+from modules.auth import routes as auth_routes
 
-print("STARTING APP...")
-print("DATABASE_URL:", os.getenv("DATABASE_URL"))
+Base.metadata.create_all(bind=engine) # creates tables on first boot
 
-app = FastAPI(title="Lonma API")
+app = FastAPI(title="LONMA Orbit API")
 
-# Create tables
-Base.metadata.create_all(bind=engine)
-print("TABLES CREATED")
-
-# Include routers
-app.include_router(auth.router, prefix="/auth", tags=["Auth"])
-app.include_router(user.router, prefix="/users", tags=["Users"])
-app.include_router(supermarket.router, prefix="/supermarkets", tags=["Supermarkets"])
-app.include_router(product.router, prefix="/products", tags=["Products"])
-app.include_router(order.router, prefix="/orders", tags=["Orders"])
-app.include_router(payment.router, prefix="/payments", tags=["Payments"])
-app.include_router(rider.router, prefix="/riders", tags=["Riders"])
+app.include_router(auth_routes.router, prefix="/auth", tags=["Auth"])
 
 @app.get("/")
 def root():
-    return {"message": "Lonma API is running"}
-
-print("APP STARTED SUCCESSFULLY")
+    return {"msg": "LONMA Orbit API Running"}
