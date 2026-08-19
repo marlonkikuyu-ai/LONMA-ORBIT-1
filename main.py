@@ -18,7 +18,7 @@ app.include_router(user_router, prefix="/user", tags=["User"])
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def home():
     if os.path.exists("static/index.html"):
         return FileResponse("static/index.html")
