@@ -23,3 +23,4 @@ def home():
     if os.path.exists("static/index.html"):
         return FileResponse("static/index.html")
     return {"message": "Lonma Orbit API is live", "docs": "/docs"}
+
