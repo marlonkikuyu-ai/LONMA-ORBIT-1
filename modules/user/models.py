@@ -1,37 +1,34 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, func, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, String, Float, ForeignKey, DateTime, Boolean
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+from datetime import datetime
 from database import Base
-
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    email = Column(String, unique=True, index=True, nullable=False)
-    phone = Column(String, unique=True, index=True)
-    hashed_password = Column(String, nullable=False)
-    is_active = Column(Boolean, default=True)
-    is_admin = Column(Boolean, default=False)  # <- added for your JWT
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    wallet = relationship("Wallet", back_populates="user", uselist=False)
-    addresses = relationship("Address", back_populates="user")
 
 class Address(Base):
     __tablename__ = "addresses"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    __table_args__ = {'extend_existing': True}
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     label = Column(String, nullable=False)
-    address_line = Column(String, nullable=False)
-    latitude = Column(Float, nullable=False)
-    longitude = Column(Float, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    user = relationship("User", back_populates="addresses")
+    street = Column(String, nullable=False)
+    city = Column(String, nullable=False)
+    lat = Column(Float, nullable=True)
+    lng = Column(Float, nullable=True)
+    is_default = Column(Boolean, default=False)
 
 class Wallet(Base):
     __tablename__ = "wallets"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    __table_args__ = {'extend_existing': True}
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), unique=True, nullable=False)
     balance = Column(Float, default=0.0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    user = relationship("User", back_populates="wallet")
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+    __table_args__ = {'extend_existing': True}
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    wallet_id = Column(UUID(as_uuid=True), ForeignKey("wallets.id"))
+    amount = Column(Float, nullable=False)
+    type = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
