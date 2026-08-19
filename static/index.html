@@ -1,48 +1,68 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lonma Orbit</title>
 <style>
-body{font-family:sans-serif;background:#f6f7fb;margin:0;padding:0}
-.top{max-width:1100px;margin:0 auto;padding:40px 20px;display:flex;justify-content:space-between;align-items:center}
-.logo{font-weight:800;font-size:22px}
-.btn{background:black;color:white;padding:10px 18px;border-radius:10px;text-decoration:none}
-.hero{max-width:1100px;margin:0 auto;padding:80px 20px;text-align:center}
-.hero h1{font-size:48px;line-height:1.1;margin:0}
-.hero p{color:#666;font-size:18px;margin-top:16px}
-.card{max-width:500px;margin:40px auto;background:white;padding:28px;border-radius:18px;box-shadow:0 10px 40px rgba(0,0,0,0.08)}
-input{width:100%;padding:14px;border-radius:10px;border:1px solid #ddd;margin:8px 0;box-sizing:border-box}
-button{width:100%;padding:14px;border-radius:10px;border:none;background:black;color:white;font-weight:600;margin-top:10px;cursor:pointer}
-.status{margin-top:14px;font-size:14px}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:#f8f8fa;color:#111}
+header{max-width:1200px;margin:0 auto;padding:18px 20px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-weight:900;font-size:20px;letter-spacing:-0.5px}
+.wrap{max-width:1200px;margin:0 auto;padding:20px;display:grid;grid-template-columns:1.1fr 0.9fr;gap:30px}
+@media(max-width:850px){.wrap{grid-template-columns:1fr}}
+.h1{font-size:54px;line-height:0.9;font-weight:900;letter-spacing:-2.5px;margin:0}
+.card{background:#fff;border-radius:22px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.08);border:1px solid #ececec}
+.tabs{display:flex;background:#f1f1f3;padding:4px;border-radius:12px;margin-bottom:18px}
+.tabs button{flex:1;padding:10px;border:0;background:transparent;border-radius:10px;font-weight:700;cursor:pointer}
+.tabs button.active{background:#111;color:#fff}
+input{width:100%;padding:14px;border:1.5px solid #e5e5e5;border-radius:12px;margin-top:8px;font-size:15px}
+.btn{width:100%;margin-top:18px;padding:14px;background:#111;color:#fff;border:0;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer}
+.msg{margin-top:14px;padding:12px;border-radius:10px;font-size:13px;display:none}
+.msg.ok{display:block;background:#e8f7ee;color:#0a5c26;border:1px solid #c3e8ce}
+.msg.err{display:block;background:#fde8e8;color:#8a1a1a;border:1px solid #f5c2c2}
+.dash{display:none}
 </style>
 </head>
 <body>
-<div class="top">
-<div class="logo">LONMA ORBIT</div>
-<a class="btn" href="/docs">API Docs</a>
-</div>
-<div class="hero">
-<h1>Fast Delivery, Smart Orbit.</h1>
-<p>Your backend is live at app.lonmaorbit.co.ke</p>
+<header><div class="logo">LONMA ORBIT</div><a href="/docs" style="font-weight:700;color:#111;text-decoration:none">API Docs</a></header>
+<div class="wrap" id="authView">
+<div><h1 class="h1">Fast Delivery,<br>Smart Orbit.</h1><p style="color:#666;margin-top:18px;line-height:1.5">Real backend connected. No dummy data. All requests hit your live FastAPI.</p><div id="apiState" style="margin-top:16px;font-weight:800">● Checking API...</div></div>
 <div class="card">
-<input id="email" placeholder="Enter email">
-<input id="pass" type="password" placeholder="Enter password">
-<button onclick="check()">Check API Connection</button>
-<div id="out" class="status"></div>
+<div class="tabs"><button id="b1" class="active" onclick="setM('login')">Login</button><button id="b2" onclick="setM('register')">Register</button></div>
+<input id="email" type="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+<button id="submit" class="btn" onclick="doAuth()">Login to Orbit</button>
+<div id="msg" class="msg"></div>
 </div>
+</div>
+<div class="wrap dash" id="dashView">
+<div><h1 class="h1" id="wel">Welcome.</h1><p id="uemail" style="color:#666"></p></div>
+<div class="card"><h3 style="margin:0">Authenticated</h3><pre id="tok" style="background:#f5f5f7;padding:12px;border-radius:10px;font-size:11px;word-break:break-all;white-space:pre-wrap"></pre><button class="btn" onclick="logout()">Logout</button></div>
 </div>
 <script>
-async function check(){
- const o=document.getElementById('out');
- o.innerText='Connecting...';
+let mode='login';
+function setM(m){mode=m;document.getElementById('b1').className=m=='login'?'active':'';document.getElementById('b2').className=m=='register'?'active':'';document.getElementById('submit').innerText=m=='login'?'Login to Orbit':'Create Account';}
+function show(t,ok){let e=document.getElementById('msg');e.innerText=t;e.className='msg '+(ok?'ok':'err');}
+async function check(){try{let r=await fetch('/');document.getElementById('apiState').innerText=r.ok?'● ONLINE - app.lonmaorbit.co.ke':'● OFFLINE';}catch{document.getElementById('apiState').innerText='● OFFLINE';}}
+function logged(){let tk=localStorage.getItem('lonma_token');if(!tk)return false;document.getElementById('authView').style.display='none';document.getElementById('dashView').style.display='grid';document.getElementById('tok').innerText=tk;return true;}
+async function doAuth(){
+ let e=document.getElementById('email').value.trim(),p=document.getElementById('password').value,b=document.getElementById('submit');
+ if(!e||!p)return show('Email and password required',false);
+ b.disabled=true;b.innerText='Processing...';
  try{
-  const r=await fetch('/docs');
-  if(r.ok) o.innerText='✅ Backend Connected - '+location.origin;
-  else o.innerText='Connected with status '+r.status;
- }catch(e){o.innerText='❌ '+e}
+  let r=await fetch((mode=='login'?'/auth/login':'/auth/register'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:e,password:p})});
+  let d=await r.json();
+  if(!r.ok)throw new Error(d.detail||JSON.stringify(d));
+  if(mode=='register'){show('Account created! Login now.',true);setM('login');}
+  else{
+   let token=d.access_token||d.token;
+   if(!token)throw new Error('Backend did not return access_token');
+   localStorage.setItem('lonma_token',token);location.reload();
+  }
+ }catch(err){show(err.message,false);}finally{b.disabled=false;b.innerText=mode=='login'?'Login to Orbit':'Create Account';}
 }
+function logout(){localStorage.clear();location.reload();}
+check();if(!logged())setM('login');
 </script>
 </body>
 </html>
