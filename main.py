@@ -1,18 +1,24 @@
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-import os
+from fastapi.middleware.cors import CORSMiddleware
+from routers.auth import router as auth_router
 
 app = FastAPI()
 
-# Create tables if you have database code - keep your existing DB code below
-# For now this line fixes logo
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.api_route("/", methods=["GET", "HEAD"])
-async def root():
-    return FileResponse(os.path.join("static", "index.html"))
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
-# --- KEEP YOUR OLD CODE BELOW THIS LINE ---
-# If you have database, auth, etc - paste it here
+@app.get("/")
+def root():
+    return {"status": "ok", "message": "Lonma Orbit API running"}
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
 
