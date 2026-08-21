@@ -11,20 +11,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Try both paths
+# This version WORKED before
 try:
-    from modules.auth.router import router as auth_router
-    print("Loaded from modules.auth")
-except ModuleNotFoundError:
-    import auth.router as auth_module
-    auth_router = auth_module.router
-    print("Loaded from auth")
-
-app.include_router(auth_router, prefix="/auth", tags=["auth"])
+    import auth
+    has_auth = True
+    app.include_router(auth.router, prefix="/auth", tags=["auth"])
+except Exception as e:
+    print(f"Auth load failed: {e}")
+    has_auth = False
 
 @app.get("/")
 def root():
-    return {"status": "ok", "auth_loaded": True}
+    return {"status": "ok", "auth_loaded": has_auth}
 
 @app.get("/health")
 def health():
