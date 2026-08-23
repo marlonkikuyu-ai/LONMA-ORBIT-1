@@ -9,9 +9,9 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_credentials=True,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -22,11 +22,31 @@ if os.path.exists(STATIC_DIR):
 
 @app.get("/")
 def root():
-    return {"status": "ok"}
+    return {"status": "ok", "service": "LONMA ORBIT"}
 
 @app.get("/www")
-def serve_frontend():
+def serve_www():
     index_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
     return {"error": "static/index.html not found"}
+
+@app.get("/orders")
+def get_orders():
+    return {"orders": []}
+
+@app.get("/supermarket")
+def get_supermarket():
+    return {"products": []}
+
+@app.get("/payments")
+def get_payments():
+    return {"payments": []}
+
+@app.get("/riders")
+def get_riders():
+    return {"riders": []}
+
+@app.get("/delivery")
+def get_delivery():
+    return {"deliveries": []}
