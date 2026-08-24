@@ -1,4 +1,57 @@
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import os
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+if os.path.isdir("static"):
+    try:
+        app.mount("/static", StaticFiles(directory="static"), name="static")
+    except:
+        pass
+
+@app.get("/")
+def root():
+    return {"status": "ok"}
+
+@app.get("/www")
+def www():
+    path = "static/index.html"
+    if os.path.exists(path):
+        return FileResponse(path)
+    return {"error": "index.html not found"}
+
+@app.get("/orders")
+def orders():
+    return {"orders": [
+        {"id": "ORD-10284", "customer": "Sarah Wanjiku", "total": 1850, "status": "Delivered"},
+        {"id": "ORD-10283", "customer": "James Omondi", "total": 4200, "status": "In Transit"},
+    ]}
+
+@app.get("/supermarket")
+def supermarket():
+    return {"products": [
+        {"name": "Fresh Milk", "price": 120, "stock": 50},
+        {"name": "Bread", "price": 70, "stock": 100}
+    ]}
+
+@app.get("/riders")
+def riders():
+    return {"riders": [{"id": 1, "name": "John", "status": "online"}]}
+
+@app.get("/payments")
+def payments():
+    return {"payments": []}
 
 class PayRequest(BaseModel):
     phone: str
@@ -7,18 +60,7 @@ class PayRequest(BaseModel):
 
 @app.post("/pay/mpesa")
 def mpesa_pay(req: PayRequest):
-    clean_phone = req.phone.replace("+", "").replace(" ", "")
-    if clean_phone.startswith("0"):
-        clean_phone = "254" + clean_phone[1:]
-    return {
-        "status": "sent",
-        "message": f"STK Push sent to {req.phone}",
-        "phone": clean_phone,
-        "amount": req.amount,
-        "order_id": req.order_id,
-        "checkout_id": f"CHK-{req.order_id}"
-    }
-
-@app.get("/pay/status/{checkout_id}")
-def pay_status(checkout_id: str):
-    return {"checkout_id": checkout_id, "status": "Paid", "method": "M-Pesa"}
+    phone = req.phone.strip().replace(" ", "").replace("+", "")
+    if phone.startswith("0"):
+        phone = "254" + phone[1:]
+    return {"status": "sent", "phone": phone, "amount": req.amount, "order_id": req.order_id, "message": f"STK sent to {req.phone}"}
