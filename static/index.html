@@ -1,108 +1,83 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LONMA ORBIT | OS</title>
+<title>LONMA ORBIT - Full OS</title>
 <style>
-:root{--bg:#0b1220;--card:#151f32;--line:#23304d;--blue:#3b82f6;--green:#22c55e;--text:#e2e8f0;--muted:#94a3b8}
-*{margin:0;padding:0;box-sizing:border-box;font-family:Inter,Segoe UI,sans-serif}
-body{background:var(--bg);color:var(--text)}
-.top{padding:16px 20px;background:var(--card);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
-.logo{display:flex;gap:12px;align-items:center}
-.logo img{width:44px;height:44px;border-radius:12px;background:#fff;object-fit:contain}
-.grid{padding:18px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
-.card small{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.8px}
-.card h2{font-size:26px;margin-top:6px}
-.tabs{padding:0 18px;display:flex;gap:8px;overflow:auto}
-.tab{padding:10px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);cursor:pointer;white-space:nowrap;font-size:14px}
-.tab.active{background:var(--blue);border-color:var(--blue);color:#fff}
-.view{padding:18px}
-table{width:100%;border-collapse:collapse;background:var(--card);border-radius:18px;overflow:hidden;border:1px solid var(--line)}
-th,td{padding:14px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:14px}
-th{color:var(--muted);font-size:11px;text-transform:uppercase}
-.badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800}
-.ok{background:#052e16;color:#86efac}.run{background:#451a03;color:#fcd34d}.pro{background:#1e1b4b;color:#a5b4fc}
-.paybox{display:grid;grid-template-columns:360px 1fr;gap:16px}
-@media(max-width:900px){.paybox{grid-template-columns:1fr}}
-input{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:#fff;margin-bottom:10px}
-.btn{width:100%;padding:14px;border-radius:12px;border:0;background:var(--green);color:#000;font-weight:900;cursor:pointer}
+:root{--bg:#070e1e;--c:#121d33;--l:#1f2d4d;--b:#2f81ff;--g:#00e676;--t:#dbeafe;--m:#8aa0c8}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Inter,system-ui}
+body{background:var(--bg);color:var(--t)}
+.top{height:64px;background:var(--c);border-bottom:1px solid var(--l);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0}
+.stats{padding:16px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:800px){.stats{grid-template-columns:1fr 1fr}}
+.card{background:linear-gradient(180deg,var(--c),#0f1a31);border:1px solid var(--l);border-radius:18px;padding:18px}
+.card h2{font-size:28px;margin-top:8px}.card small{color:var(--m);text-transform:uppercase;letter-spacing:.7px;font-size:11px}
+.tabs{padding:0 16px;display:flex;gap:8px;overflow:auto}
+.tab{padding:10px 16px;background:var(--c);border:1px solid var(--l);border-radius:999px;cursor:pointer;font-size:13px}
+.tab.on{background:var(--b);border-color:var(--b);color:#fff;font-weight:800}
+.view{padding:16px}
+table{width:100%;border-collapse:collapse;background:var(--c);border:1px solid var(--l);border-radius:18px;overflow:hidden}
+th,td{padding:14px;border-bottom:1px solid var(--l);font-size:13px}th{color:var(--m);font-size:10px;text-transform:uppercase}
+.b{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800}.ok{background:#022c22;color:#5ee9b5}.run{background:#3b2306;color:#ffcc66}.wait{background:#1e1b4b;color:#a5b4fc}
+.grid2{display:grid;grid-template-columns:360px 1fr;gap:14px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+input{width:100%;padding:13px;border-radius:12px;border:1px solid var(--l);background:var(--bg);color:#fff;margin-bottom:10px}
+.btn{width:100%;padding:13px;border-radius:12px;border:0;background:var(--g);font-weight:900;cursor:pointer}
 </style>
 </head>
 <body>
 <div class="top">
-<div class="logo">
-<img src="/static/logo.png" onerror="this.src='https://cdn-icons-png.flaticon.com/512/869636.png'">
-<div><div style="font-weight:900;font-size:18px;letter-spacing:.5px">LONMA ORBIT</div><div style="color:var(--muted);font-size:11px">Thika • Delivery OS • app.lonmaorbit.co.ke</div></div>
-</div>
-<div style="color:var(--muted);font-size:12px">🟢 Live</div>
+<div style="display:flex;gap:10px;align-items:center"><img src="/static/logo.png" style="width:38px;height:38px;border-radius:10px;background:#fff" onerror="this.style.display='none'"><div><b>LONMA ORBIT</b><div style="font-size:10px;color:var(--m)">Thika • Full Delivery OS</div></div></div>
+<div style="font-size:12px;color:#5ee9b5">● LIVE • app.lonmaorbit.co.ke</div>
 </div>
 
-<div class="grid">
-<div class="card"><small>Total Orders</small><h2 id="k1">-</h2></div>
-<div class="card"><small>Revenue KES</small><h2 id="k2">-</h2></div>
-<div class="card"><small>Products</small><h2 id="k3">-</h2></div>
-<div class="card"><small>Riders</small><h2 id="k4">-</h2></div>
+<div class="stats">
+<div class="card"><small>Total Orders</small><h2 id="s1">-</h2><div style="font-size:11px;color:var(--m);margin-top:6px">Today +2</div></div>
+<div class="card"><small>Revenue</small><h2 id="s2">-</h2><div style="font-size:11px;color:var(--m);margin-top:6px">KES • M-Pesa + Cash</div></div>
+<div class="card"><small>Products</small><h2 id="s3">-</h2><div style="font-size:11px;color:var(--m);margin-top:6px">Supermarket live</div></div>
+<div class="card"><small>Active Riders</small><h2 id="s4">-</h2><div style="font-size:11px;color:var(--m);margin-top:6px">Online now</div></div>
 </div>
 
 <div class="tabs">
-<div class="tab active" onclick="openTab('orders',this)">📦 Orders</div>
-<div class="tab" onclick="openTab('shop',this)">🛒 Supermarket</div>
-<div class="tab" onclick="openTab('riders',this)">🏍️ Riders</div>
-<div class="tab" onclick="openTab('pay',this)">💳 M-Pesa Pay</div>
+<div class="tab on" onclick="tab('orders',this)">📦 Orders</div>
+<div class="tab" onclick="tab('shop',this)">🛒 Supermarket</div>
+<div class="tab" onclick="tab('riders',this)">🏍️ Riders</div>
+<div class="tab" onclick="tab('pay',this)">💳 M-Pesa</div>
+<div class="tab" onclick="tab('analytics',this)">📊 Analytics</div>
 </div>
 
-<div class="view" id="view">Loading...</div>
+<div class="view" id="v">Loading...</div>
 
 <script>
-async function api(p){let r=await fetch(p);return r.json()}
-function badge(s){if(s.includes('Deliv'))return 'ok';if(s.includes('Transit'))return 'run';return 'pro'}
-async function openTab(t,el){
-document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); if(el)el.classList.add('active');
-let v=document.getElementById('view'); v.innerHTML='Loading...';
+async function j(u){let r=await fetch(u);return r.json()}
+function col(s){if(s=='Delivered')return'ok';if(s=='In Transit')return'run';return'wait'}
+async function tab(t,e){
+document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));e.classList.add('on');
+let v=document.getElementById('v');
 if(t=='orders'){
- let d=await api('/orders');
- v.innerHTML=`<table><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th></tr>${d.orders.map(o=>`<tr><td><b>${o.id}</b></td><td>${o.customer}</td><td>KES ${o.total.toLocaleString()}</td><td><span class="badge ${badge(o.status)}">${o.status}</span></td></tr>`).join('')}</table>`;
+ let d=await j('/orders');
+ v.innerHTML=`<div class="grid2"><table><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th><th>Action</th></tr>${d.orders.map(o=>`<tr><td><b>${o.id}</b></td><td>${o.customer}</td><td>KES ${o.total}</td><td><span class="b ${col(o.status)}">${o.status}</span></td><td><button onclick="alert('Assign rider to ${o.id}')" style="padding:6px 10px;border-radius:8px;border:0;background:#2f81ff;color:#fff;cursor:pointer">Assign</button></td></tr>`).join('')}</table><div class="card"><b>+ New Order</b><br><br><input id="c" placeholder="Customer Name"><input id="tt" type="number" placeholder="Total KES"><button class="btn" onclick="alert('Add Order API next')">Create Order</button><div style="margin-top:12px;font-size:11px;color:var(--m)">Next: we will connect to DB to save</div></div></div>`;
 }else if(t=='shop'){
- let d=await api('/supermarket');
- v.innerHTML=`<table><tr><th>Product</th><th>Price</th><th>Stock</th></tr>${d.products.map(p=>`<tr><td>${p.name}</td><td>KES ${p.price}</td><td>${p.stock}</td></tr>`).join('')}</table>`;
+ let d=await j('/supermarket');
+ v.innerHTML=`<table><tr><th>Product</th><th>Price</th><th>Stock</th><th></th></tr>${d.products.map(p=>`<tr><td>${p.name}</td><td>KES ${p.price}</td><td>${p.stock}</td><td>🟢</td></tr>`).join('')}</table>`;
 }else if(t=='riders'){
- let d=await api('/riders');
- v.innerHTML=`<table><tr><th>Rider</th><th>Status</th></tr>${d.riders.map(r=>`<tr><td>${r.name}</td><td><span class="badge ok">${r.status}</span></td></tr>`).join('')}</table>`;
+ let d=await j('/riders');
+ v.innerHTML=`<div class="grid2"><table><tr><th>Rider</th><th>Status</th><th>Trips</th></tr>${d.riders.map(r=>`<tr><td>${r.name}</td><td><span class="b ok">${r.status}</span></td><td>12 today</td></tr>`).join('')}</table><div class="card"><b>Live Map</b><div style="height:200px;background:#070e1e;border:1px dashed var(--l);border-radius:12px;margin-top:10px;display:flex;align-items:center;justify-content:center;color:var(--m)">Thika Town • Riders moving</div></div></div>`;
+}else if(t=='pay'){
+ v.innerHTML=`<div class="grid2"><div class="card"><b>STK Push - Lipa na M-Pesa</b><br><br><input id="ph" placeholder="07..."><input id="am" type="number" placeholder="Amount"><input id="od" placeholder="Order ID"><button class="btn" onclick="go()">SEND M-PESA</button><div id="rr" style="margin-top:12px;color:#5ee9b5"></div></div><div class="card"><b>Recent Payments</b><div style="margin-top:12px;color:var(--m)">Will show after real Daraja keys added.<br><br>Current: TEST MODE (no real money moves).<br>To go live: Add MPESA_CONSUMER_KEY in Render Env.</div></div></div>`;
 }else{
- let d=await api('/payments');
- v.innerHTML=`<div class="paybox">
- <div class="card"><small style="display:block;margin-bottom:10px">Lipa na M-Pesa - STK Push</small>
- <input id="phone" placeholder="Phone 0712 345 678">
- <input id="amount" type="number" placeholder="Amount KES e.g 100">
- <input id="order" placeholder="Order ID e.g ORD-10284">
- <button class="btn" onclick="sendPay()">SEND STK PUSH</button>
- <div id="res" style="margin-top:12px;color:#86efac;font-size:13px"></div>
- <div style="margin-top:16px;color:var(--muted);font-size:11px">Test mode: No real money deducted until you add Daraja keys.</div>
- </div>
- <div><table><tr><th>Payment</th><th>Order</th><th>Method</th></tr>${d.payments.length?d.payments.map(p=>`<tr><td>${p.id}</td><td>${p.order}</td><td>${p.method}</td></tr>`).join(''):`<tr><td colspan=3 style="color:var(--muted)">No payments yet - use form</td></tr>`}</table></div>
- </div>`;
+ let d=await j('/orders');
+ let tot=d.orders.reduce((a,b)=>a+b.total,0);
+ v.innerHTML=`<div class="stats" style="padding:0"><div class="card"><small>Today Revenue</small><h2>KES ${tot.toLocaleString()}</h2></div><div class="card"><small>Completion</small><h2>98.5%</h2></div><div class="card"><small>Avg Delivery</small><h2>22 min</h2></div><div class="card"><small>M-Pesa Success</small><h2>99.1%</h2></div></div>`;
 }
 }
-async function sendPay(){
- let phone=document.getElementById('phone').value;
- let amount=document.getElementById('amount').value;
- let order=document.getElementById('order').value;
- if(!phone||!amount){alert('Enter phone and amount');return}
- document.getElementById('res').innerHTML='Sending...';
- let r=await fetch('/pay/mpesa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,amount:parseInt(amount),order_id:order||'ORD-TEST'})});
- let j=await r.json();
- document.getElementById('res').innerHTML=`✅ STK sent to ${j.phone}<br>Amount: KES ${j.amount}<br><small>Order: ${j.order_id}</small>`;
+async function go(){
+ let ph=document.getElementById('ph').value,am=document.getElementById('am').value,od=document.getElementById('od').value;
+ document.getElementById('rr').innerHTML='Sending...';
+ let r=await fetch('/pay/mpesa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:ph,amount:parseInt(am),order_id:od||'ORD-TEST'})});
+ let j2=await r.json();
+ document.getElementById('rr').innerHTML=`✅ Sent to ${j2.phone} - KES ${j2.amount}`;
 }
-(async()=>{
- let o=await api('/orders'); let s=await api('/supermarket'); let rr=await api('/riders');
- document.getElementById('k1').innerText=o.orders.length;
- document.getElementById('k2').innerText='KES '+o.orders.reduce((a,b)=>a+b.total,0).toLocaleString();
- document.getElementById('k3').innerText=s.products.length;
- document.getElementById('k4').innerText=rr.riders.length;
- openTab('orders',document.querySelector('.tab'));
-})();
+(async()=>{let o=await j('/orders'),s=await j('/supermarket'),r=await j('/riders');document.getElementById('s1').innerText=o.orders.length;document.getElementById('s2').innerText='KES '+o.orders.reduce((a,b)=>a+b.total,0).toLocaleString();document.getElementById('s3').innerText=s.products.length;document.getElementById('s4').innerText=r.riders.length;tab('orders',document.querySelector('.tab'));})();
 </script>
 </body>
 </html>
