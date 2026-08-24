@@ -1,70 +1,107 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LONMA ORBIT</title>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LONMA ORBIT | OS</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:sans-serif}
-body{background:#0f172a;color:#fff}
-.header{background:#1e293b;padding:16px 24px;display:flex;align-items:center;gap:12px}
-.header img{width:42px;height:42px;border-radius:10px;background:#fff}
-.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;padding:24px}
-.card{background:#1e293b;padding:20px;border-radius:16px}
-.tabs{display:flex;gap:8px;padding:0 24px}
-.tab{padding:10px 18px;background:#1e293b;border-radius:10px;cursor:pointer}
-.tab.active{background:#3b82f6}
-.section{padding:24px}
-table{width:100%;background:#1e293b;border-radius:16px;border-collapse:collapse;overflow:hidden}
-th,td{padding:14px;text-align:left;border-bottom:1px solid #334155}
-input,button{width:100%;padding:12px;border-radius:10px;border:1px solid #334155;background:#0f172a;color:#fff;margin-bottom:10px}
-button{background:#22c55e;color:#000;font-weight:800;border:0;cursor:pointer}
+:root{--bg:#0b1220;--card:#151f32;--line:#23304d;--blue:#3b82f6;--green:#22c55e;--text:#e2e8f0;--muted:#94a3b8}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Inter,Segoe UI,sans-serif}
+body{background:var(--bg);color:var(--text)}
+.top{padding:16px 20px;background:var(--card);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+.logo{display:flex;gap:12px;align-items:center}
+.logo img{width:44px;height:44px;border-radius:12px;background:#fff;object-fit:contain}
+.grid{padding:18px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
+.card small{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.8px}
+.card h2{font-size:26px;margin-top:6px}
+.tabs{padding:0 18px;display:flex;gap:8px;overflow:auto}
+.tab{padding:10px 16px;border-radius:12px;background:var(--card);border:1px solid var(--line);cursor:pointer;white-space:nowrap;font-size:14px}
+.tab.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.view{padding:18px}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:18px;overflow:hidden;border:1px solid var(--line)}
+th,td{padding:14px 12px;text-align:left;border-bottom:1px solid var(--line);font-size:14px}
+th{color:var(--muted);font-size:11px;text-transform:uppercase}
+.badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800}
+.ok{background:#052e16;color:#86efac}.run{background:#451a03;color:#fcd34d}.pro{background:#1e1b4b;color:#a5b4fc}
+.paybox{display:grid;grid-template-columns:360px 1fr;gap:16px}
+@media(max-width:900px){.paybox{grid-template-columns:1fr}}
+input{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:#fff;margin-bottom:10px}
+.btn{width:100%;padding:14px;border-radius:12px;border:0;background:var(--green);color:#000;font-weight:900;cursor:pointer}
 </style>
 </head>
 <body>
-<div class="header">
-<img src="/static/logo.png">
-<div><b>LONMA ORBIT</b><br><small>app.lonmaorbit.co.ke</small></div>
+<div class="top">
+<div class="logo">
+<img src="/static/logo.png" onerror="this.src='https://cdn-icons-png.flaticon.com/512/869636.png'">
+<div><div style="font-weight:900;font-size:18px;letter-spacing:.5px">LONMA ORBIT</div><div style="color:var(--muted);font-size:11px">Thika • Delivery OS • app.lonmaorbit.co.ke</div></div>
 </div>
-<div class="stats">
-<div class="card"><div>Total Orders</div><h2 id="t1">-</h2></div>
-<div class="card"><div>Revenue</div><h2 id="t2">-</h2></div>
+<div style="color:var(--muted);font-size:12px">🟢 Live</div>
 </div>
+
+<div class="grid">
+<div class="card"><small>Total Orders</small><h2 id="k1">-</h2></div>
+<div class="card"><small>Revenue KES</small><h2 id="k2">-</h2></div>
+<div class="card"><small>Products</small><h2 id="k3">-</h2></div>
+<div class="card"><small>Riders</small><h2 id="k4">-</h2></div>
+</div>
+
 <div class="tabs">
-<div class="tab active" onclick="show('orders')">Orders</div>
-<div class="tab" onclick="show('pay')">M-Pesa Pay</div>
+<div class="tab active" onclick="openTab('orders',this)">📦 Orders</div>
+<div class="tab" onclick="openTab('shop',this)">🛒 Supermarket</div>
+<div class="tab" onclick="openTab('riders',this)">🏍️ Riders</div>
+<div class="tab" onclick="openTab('pay',this)">💳 M-Pesa Pay</div>
 </div>
-<div class="section" id="box">Loading...</div>
+
+<div class="view" id="view">Loading...</div>
+
 <script>
-async function get(u){let r=await fetch(u);return r.json()}
-async function show(t){
-let b=document.getElementById('box');
+async function api(p){let r=await fetch(p);return r.json()}
+function badge(s){if(s.includes('Deliv'))return 'ok';if(s.includes('Transit'))return 'run';return 'pro'}
+async function openTab(t,el){
+document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); if(el)el.classList.add('active');
+let v=document.getElementById('view'); v.innerHTML='Loading...';
 if(t=='orders'){
-let d=await get('/orders');
-b.innerHTML=`<table><tr><th>ID</th><th>Customer</th><th>Total</th></tr>${d.orders.map(o=>`<tr><td>${o.id}</td><td>${o.customer}</td><td>${o.total}</td></tr>`).join('')}</table>`;
+ let d=await api('/orders');
+ v.innerHTML=`<table><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th></tr>${d.orders.map(o=>`<tr><td><b>${o.id}</b></td><td>${o.customer}</td><td>KES ${o.total.toLocaleString()}</td><td><span class="badge ${badge(o.status)}">${o.status}</span></td></tr>`).join('')}</table>`;
+}else if(t=='shop'){
+ let d=await api('/supermarket');
+ v.innerHTML=`<table><tr><th>Product</th><th>Price</th><th>Stock</th></tr>${d.products.map(p=>`<tr><td>${p.name}</td><td>KES ${p.price}</td><td>${p.stock}</td></tr>`).join('')}</table>`;
+}else if(t=='riders'){
+ let d=await api('/riders');
+ v.innerHTML=`<table><tr><th>Rider</th><th>Status</th></tr>${d.riders.map(r=>`<tr><td>${r.name}</td><td><span class="badge ok">${r.status}</span></td></tr>`).join('')}</table>`;
 }else{
-b.innerHTML=`
-<h3>M-Pesa Payment</h3><br>
-<input id="p" placeholder="Phone 07...">
-<input id="a" placeholder="Amount" type="number">
-<input id="o" placeholder="Order ID">
-<button onclick="pay()">SEND M-PESA</button>
-<div id="r"></div>`;
+ let d=await api('/payments');
+ v.innerHTML=`<div class="paybox">
+ <div class="card"><small style="display:block;margin-bottom:10px">Lipa na M-Pesa - STK Push</small>
+ <input id="phone" placeholder="Phone 0712 345 678">
+ <input id="amount" type="number" placeholder="Amount KES e.g 100">
+ <input id="order" placeholder="Order ID e.g ORD-10284">
+ <button class="btn" onclick="sendPay()">SEND STK PUSH</button>
+ <div id="res" style="margin-top:12px;color:#86efac;font-size:13px"></div>
+ <div style="margin-top:16px;color:var(--muted);font-size:11px">Test mode: No real money deducted until you add Daraja keys.</div>
+ </div>
+ <div><table><tr><th>Payment</th><th>Order</th><th>Method</th></tr>${d.payments.length?d.payments.map(p=>`<tr><td>${p.id}</td><td>${p.order}</td><td>${p.method}</td></tr>`).join(''):`<tr><td colspan=3 style="color:var(--muted)">No payments yet - use form</td></tr>`}</table></div>
+ </div>`;
 }
 }
-async function pay(){
-let phone=document.getElementById('p').value;
-let amount=document.getElementById('a').value;
-let order=document.getElementById('o').value;
-let res=await fetch('/pay/mpesa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:phone,amount:parseInt(amount),order_id:order})});
-let data=await res.json();
-document.getElementById('r').innerHTML="✅ Sent to "+data.phone+" : KES "+data.amount;
+async function sendPay(){
+ let phone=document.getElementById('phone').value;
+ let amount=document.getElementById('amount').value;
+ let order=document.getElementById('order').value;
+ if(!phone||!amount){alert('Enter phone and amount');return}
+ document.getElementById('res').innerHTML='Sending...';
+ let r=await fetch('/pay/mpesa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,amount:parseInt(amount),order_id:order||'ORD-TEST'})});
+ let j=await r.json();
+ document.getElementById('res').innerHTML=`✅ STK sent to ${j.phone}<br>Amount: KES ${j.amount}<br><small>Order: ${j.order_id}</small>`;
 }
 (async()=>{
-let d=await get('/orders');
-document.getElementById('t1').innerText=d.orders.length;
-document.getElementById('t2').innerText=d.orders.reduce((x,y)=>x+y.total,0);
-show('orders');
+ let o=await api('/orders'); let s=await api('/supermarket'); let rr=await api('/riders');
+ document.getElementById('k1').innerText=o.orders.length;
+ document.getElementById('k2').innerText='KES '+o.orders.reduce((a,b)=>a+b.total,0).toLocaleString();
+ document.getElementById('k3').innerText=s.products.length;
+ document.getElementById('k4').innerText=rr.riders.length;
+ openTab('orders',document.querySelector('.tab'));
 })();
 </script>
 </body>
