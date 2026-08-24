@@ -1,111 +1,91 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LONMA ORBIT - Full Dashboard</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LONMA ORBIT - Control Center</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:system-ui;background:#f5f7fb;display:flex;min-height:100vh}
-.sidebar{width:260px;background:#0f2a44;color:white;padding:20px;position:fixed;height:100vh;overflow-y:auto}
-.sidebar h2{display:flex;align-items:center;gap:10px;margin-bottom:30px}
-.sidebar img{width:40px;height:40px;background:white;border-radius:8px;padding:4px}
-.menu a{display:block;color:#a9c0d8;padding:12px 14px;border-radius:8px;text-decoration:none;margin-bottom:6px;cursor:pointer}
-.menu a.active,.menu a:hover{background:#1a446e;color:white}
-.main{margin-left:260px;flex:1;padding:24px}
-.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-.card{background:white;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:20px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
-.stat h3{font-size:14px;color:#666}
-.stat h1{font-size:28px;margin-top:6px;color:#0f2a44}
-table{width:100%;border-collapse:collapse}
-th,td{padding:10px;text-align:left;border-bottom:1px solid #eee}
-button{background:#0091c7;color:white;border:0;padding:8px 14px;border-radius:8px;cursor:pointer}
-.badge{padding:4px 8px;border-radius:20px;font-size:12px;background:#e6f6ec;color:#0a7a2e}
-@media(max-width:768px){.sidebar{display:none}.main{margin-left:0}}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Inter,system-ui,sans-serif}
+body{background:#0f172a;color:#fff}
+.header{background:#1e293b;padding:16px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #334155}
+.header img{width:42px;height:42px;border-radius:10px;background:#fff;object-fit:contain}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:24px}
+.card{background:#1e293b;padding:20px;border-radius:16px;border:1px solid #334155}
+.card h3{color:#94a3b8;font-size:13px;text-transform:uppercase}
+.card .num{font-size:28px;font-weight:800;margin-top:8px}
+.tabs{display:flex;gap:8px;padding:0 24px}
+.tab{padding:10px 18px;background:#1e293b;border-radius:10px;cursor:pointer;border:1px solid #334155}
+.tab.active{background:#3b82f6;border-color:#3b82f6}
+.section{padding:24px}
+table{width:100%;background:#1e293b;border-radius:16px;border-collapse:collapse;overflow:hidden}
+th,td{padding:14px 16px;text-align:left;border-bottom:1px solid #334155}
+th{color:#94a3b8;font-size:12px;text-transform:uppercase}
+.status{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.Delivered{background:#065f46;color:#6ee7b7}
+.In\ Transit{background:#78350f;color:#fcd34d}
+.Processing{background:#1e40af;color:#93c5fd}
+@media(max-width:800px){.stats{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
-<div class="sidebar">
-<h2><img src="/static/logo.png" onerror="this.src='https://via.placeholder.com/40'"> LONMA ORBIT</h2>
-<div class="menu">
-<a class="active" onclick="showTab('dashboard',this)">📊 Dashboard</a>
-<a onclick="showTab('orders',this)">📦 Orders</a>
-<a onclick="showTab('supermarket',this)">🛒 Supermarket</a>
-<a onclick="showTab('payments',this)">💳 Payments</a>
-<a onclick="showTab('riders',this)">🏍️ Riders</a>
-<a onclick="showTab('settings',this)">⚙️ Settings</a>
-</div>
-</div>
-<div class="main">
-<div class="topbar">
-<h1 id="pageTitle">Dashboard</h1>
-<div><span id="apiStatus">API: https://app.lonmaorbit.co.ke</span></div>
-</div>
-
-<div id="dashboard">
-<div class="grid">
-<div class="card stat"><h3>Total Orders</h3><h1 id="totalOrders">--</h1></div>
-<div class="card stat"><h3>Products</h3><h1 id="totalProducts">--</h1></div>
-<div class="card stat"><h3>Revenue</h3><h1>KES <span id="rev">0</span></h1></div>
-<div class="card stat"><h3>Riders Online</h3><h1 id="riders">--</h1></div>
-</div>
-<div class="card">
-<h3>Logo Status</h3><br>
-<img src="/static/logo.png" style="height:60px;background:#0091c7;padding:8px;border-radius:8px" onerror="this.style.display='none'">
-<p style="margin-top:10px">✅ Logo import successful from <code>/static/logo.png</code></p>
+<div class="header">
+<img src="/static/logo.png" onerror="this.src='https://via.placeholder.com/42'">
+<div>
+<div style="font-weight:800;font-size:18px">LONMA ORBIT</div>
+<div style="color:#94a3b8;font-size:12px">Delivery & Supermarket OS • app.lonmaorbit.co.ke</div>
 </div>
 </div>
 
-<div id="orders" style="display:none">
-<div class="card">
-<div style="display:flex;justify-content:space-between"><h3>Orders</h3><button onclick="loadOrders()">Refresh</button></div>
-<table><thead><tr><th>ID</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead><tbody id="ordersBody"></tbody></table>
-</div>
-</div>
-
-<div id="supermarket" style="display:none">
-<div class="card">
-<div style="display:flex;justify-content:space-between"><h3>Products</h3><button onclick="loadProducts()">Refresh</button></div>
-<table><thead><tr><th>Product</th><th>Price</th><th>Stock</th></tr></thead><tbody id="prodBody"></tbody></table>
-</div>
+<div class="stats">
+<div class="card"><h3>Total Orders</h3><div class="num" id="totalOrders">-</div></div>
+<div class="card"><h3>Products</h3><div class="num" id="totalProducts">-</div></div>
+<div class="card"><h3>Riders Online</h3><div class="num" id="totalRiders">-</div></div>
+<div class="card"><h3>Revenue (KES)</h3><div class="num" id="totalRev">-</div></div>
 </div>
 
-<div id="payments" style="display:none"><div class="card"><h3>Payments</h3><p>M-Pesa & Card payments will show here.</p><div id="payBody"></div></div></div>
-<div id="riders" style="display:none"><div class="card"><h3>Riders</h3><div id="ridersBody"></div></div></div>
-<div id="settings" style="display:none"><div class="card"><h3>Settings</h3><p>App running at app.lonmaorbit.co.ke<br>Main site: lonmaorbit.co.ke</p></div></div>
-
+<div class="tabs">
+<div class="tab active" onclick="loadTab('orders')">📦 Orders</div>
+<div class="tab" onclick="loadTab('supermarket')">🛒 Supermarket</div>
+<div class="tab" onclick="loadTab('riders')">🏍️ Riders</div>
+<div class="tab" onclick="loadTab('payments')">💳 Payments</div>
 </div>
+
+<div class="section" id="content">Loading...</div>
 
 <script>
-const API = "";
-function showTab(id,el){
-document.querySelectorAll('.main > div').forEach(d=>{if(d.id) d.style.display='none'});
-document.getElementById(id).style.display='block';
-document.getElementById('pageTitle').innerText = id.charAt(0).toUpperCase()+id.slice(1);
-document.querySelectorAll('.menu a').forEach(a=>a.classList.remove('active'));
-el.classList.add('active');
-if(id==='orders') loadOrders();
-if(id==='supermarket') loadProducts();
+let current='orders';
+async function fetchJSON(url){const r=await fetch(url);return r.json()}
+async function loadTab(tab){
+current=tab;
+document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+event?.target?.classList?.add('active');
+const c=document.getElementById('content');
+c.innerHTML='Loading...';
+if(tab==='orders'){
+ const d=await fetchJSON('/orders');
+ c.innerHTML=`<table><tr><th>ID</th><th>Customer</th><th>Total</th><th>Status</th></tr>${d.orders.map(o=>`<tr><td>${o.id}</td><td>${o.customer}</td><td>KES ${o.total}</td><td><span class="status ${o.status}">${o.status}</span></td></tr>`).join('')}</table>`;
+}else if(tab==='supermarket'){
+ const d=await fetchJSON('/supermarket');
+ c.innerHTML=`<table><tr><th>Product</th><th>Price</th><th>Stock</th></tr>${d.products.map(p=>`<tr><td>${p.name}</td><td>KES ${p.price}</td><td>${p.stock}</td></tr>`).join('')}</table>`;
+}else if(tab==='riders'){
+ const d=await fetchJSON('/riders');
+ c.innerHTML=`<table><tr><th>Rider</th><th>Status</th></tr>${d.riders.map(r=>`<tr><td>${r.name}</td><td>${r.status}</td></tr>`).join('')}</table>`;
+}else{
+ const d=await fetchJSON('/payments');
+ c.innerHTML=`<table><tr><th>Payment</th><th>Order</th><th>Amount</th><th>Method</th></tr>${d.payments.map(p=>`<tr><td>${p.id}</td><td>${p.order}</td><td>KES ${p.amount}</td><td>${p.method}</td></tr>`).join('')}</table>`;
 }
-async function loadOrders(){
-try{
-let r = await fetch('/orders'); let j = await r.json();
-document.getElementById('totalOrders').innerText = j.orders ? j.orders.length : j.length || 0;
-let rows = (j.orders||j).map(o=>`<tr><td>${o.id||'-'}</td><td>${o.customer||'Guest'}</td><td>KES ${o.total||0}</td><td><span class="badge">${o.status||'pending'}</span></td></tr>`).join('');
-document.getElementById('ordersBody').innerHTML = rows || '<tr><td colspan=4>No orders yet</td></tr>';
-}catch(e){document.getElementById('ordersBody').innerHTML='<tr><td>API not connected</td></tr>'}
 }
-async function loadProducts(){
-try{
-let r = await fetch('/supermarket'); let j = await r.json();
-let items = j.products||j;
-document.getElementById('totalProducts').innerText = items.length;
-document.getElementById('prodBody').innerHTML = items.map(p=>`<tr><td>${p.name||p.title}</td><td>KES ${p.price||0}</td><td>${p.stock||'-'}</td></tr>`).join('') || '<tr><td colspan=3>No products</td></tr>';
-}catch(e){document.getElementById('prodBody').innerHTML='<tr><td>API not connected</td></tr>'}
+async function loadStats(){
+ const o=await fetchJSON('/orders');
+ const s=await fetchJSON('/supermarket');
+ const r=await fetchJSON('/riders');
+ document.getElementById('totalOrders').textContent=o.orders.length;
+ document.getElementById('totalProducts').textContent=s.products.length;
+ document.getElementById('totalRiders').textContent=r.riders.length;
+ document.getElementById('totalRev').textContent=o.orders.reduce((a,b)=>a+b.total,0).toLocaleString();
+ loadTab('orders');
 }
-loadOrders(); loadProducts();
-fetch('/riders').then(r=>r.json()).then(j=>{document.getElementById('riders').innerText = (j.riders||j).length || 0}).catch(()=>{});
+loadStats();
 </script>
 </body>
 </html>
