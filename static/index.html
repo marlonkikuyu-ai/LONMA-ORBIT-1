@@ -1,2 +1,111 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LONMA ORBIT</title><link rel="icon" href="/static/logo.png"><style>body{margin:0;font-family:Arial;background:#f1f5f9;display:flex;min-height:100vh}.sidebar{width:240px;background:#0f172a;color:white;padding:20px;position:fixed;height:100vh}.main{margin-left:240px;flex:1;padding:24px}.logo{display:flex;align-items:center;gap:12px;margin-bottom:30px}.logo img{width:40px;height:40px;border-radius:8px;background:white;padding:3px}</style></head><body><div class="sidebar"><div class="logo"><img src="/static/logo.png"><h3 style="margin:0">LONMA ORBIT</h3></div><p style="color:#94a3b8;font-size:13px">Backend is live</p></div><div class="main"><h1>Dashboard</h1><div style="background:white;padding:20px;border-radius:12px;margin-top:20px"><img src="/static/logo.png" style="width:100px"><p>Logo import successful ✅</p><p>API: https://app.lonmaorbit.co.ke</p></div></div></body></html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LONMA ORBIT - Full Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:system-ui;background:#f5f7fb;display:flex;min-height:100vh}
+.sidebar{width:260px;background:#0f2a44;color:white;padding:20px;position:fixed;height:100vh;overflow-y:auto}
+.sidebar h2{display:flex;align-items:center;gap:10px;margin-bottom:30px}
+.sidebar img{width:40px;height:40px;background:white;border-radius:8px;padding:4px}
+.menu a{display:block;color:#a9c0d8;padding:12px 14px;border-radius:8px;text-decoration:none;margin-bottom:6px;cursor:pointer}
+.menu a.active,.menu a:hover{background:#1a446e;color:white}
+.main{margin-left:260px;flex:1;padding:24px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.card{background:white;border-radius:12px;padding:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.stat h3{font-size:14px;color:#666}
+.stat h1{font-size:28px;margin-top:6px;color:#0f2a44}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;text-align:left;border-bottom:1px solid #eee}
+button{background:#0091c7;color:white;border:0;padding:8px 14px;border-radius:8px;cursor:pointer}
+.badge{padding:4px 8px;border-radius:20px;font-size:12px;background:#e6f6ec;color:#0a7a2e}
+@media(max-width:768px){.sidebar{display:none}.main{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="sidebar">
+<h2><img src="/static/logo.png" onerror="this.src='https://via.placeholder.com/40'"> LONMA ORBIT</h2>
+<div class="menu">
+<a class="active" onclick="showTab('dashboard',this)">📊 Dashboard</a>
+<a onclick="showTab('orders',this)">📦 Orders</a>
+<a onclick="showTab('supermarket',this)">🛒 Supermarket</a>
+<a onclick="showTab('payments',this)">💳 Payments</a>
+<a onclick="showTab('riders',this)">🏍️ Riders</a>
+<a onclick="showTab('settings',this)">⚙️ Settings</a>
+</div>
+</div>
+<div class="main">
+<div class="topbar">
+<h1 id="pageTitle">Dashboard</h1>
+<div><span id="apiStatus">API: https://app.lonmaorbit.co.ke</span></div>
+</div>
+
+<div id="dashboard">
+<div class="grid">
+<div class="card stat"><h3>Total Orders</h3><h1 id="totalOrders">--</h1></div>
+<div class="card stat"><h3>Products</h3><h1 id="totalProducts">--</h1></div>
+<div class="card stat"><h3>Revenue</h3><h1>KES <span id="rev">0</span></h1></div>
+<div class="card stat"><h3>Riders Online</h3><h1 id="riders">--</h1></div>
+</div>
+<div class="card">
+<h3>Logo Status</h3><br>
+<img src="/static/logo.png" style="height:60px;background:#0091c7;padding:8px;border-radius:8px" onerror="this.style.display='none'">
+<p style="margin-top:10px">✅ Logo import successful from <code>/static/logo.png</code></p>
+</div>
+</div>
+
+<div id="orders" style="display:none">
+<div class="card">
+<div style="display:flex;justify-content:space-between"><h3>Orders</h3><button onclick="loadOrders()">Refresh</button></div>
+<table><thead><tr><th>ID</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead><tbody id="ordersBody"></tbody></table>
+</div>
+</div>
+
+<div id="supermarket" style="display:none">
+<div class="card">
+<div style="display:flex;justify-content:space-between"><h3>Products</h3><button onclick="loadProducts()">Refresh</button></div>
+<table><thead><tr><th>Product</th><th>Price</th><th>Stock</th></tr></thead><tbody id="prodBody"></tbody></table>
+</div>
+</div>
+
+<div id="payments" style="display:none"><div class="card"><h3>Payments</h3><p>M-Pesa & Card payments will show here.</p><div id="payBody"></div></div></div>
+<div id="riders" style="display:none"><div class="card"><h3>Riders</h3><div id="ridersBody"></div></div></div>
+<div id="settings" style="display:none"><div class="card"><h3>Settings</h3><p>App running at app.lonmaorbit.co.ke<br>Main site: lonmaorbit.co.ke</p></div></div>
+
+</div>
+
+<script>
+const API = "";
+function showTab(id,el){
+document.querySelectorAll('.main > div').forEach(d=>{if(d.id) d.style.display='none'});
+document.getElementById(id).style.display='block';
+document.getElementById('pageTitle').innerText = id.charAt(0).toUpperCase()+id.slice(1);
+document.querySelectorAll('.menu a').forEach(a=>a.classList.remove('active'));
+el.classList.add('active');
+if(id==='orders') loadOrders();
+if(id==='supermarket') loadProducts();
+}
+async function loadOrders(){
+try{
+let r = await fetch('/orders'); let j = await r.json();
+document.getElementById('totalOrders').innerText = j.orders ? j.orders.length : j.length || 0;
+let rows = (j.orders||j).map(o=>`<tr><td>${o.id||'-'}</td><td>${o.customer||'Guest'}</td><td>KES ${o.total||0}</td><td><span class="badge">${o.status||'pending'}</span></td></tr>`).join('');
+document.getElementById('ordersBody').innerHTML = rows || '<tr><td colspan=4>No orders yet</td></tr>';
+}catch(e){document.getElementById('ordersBody').innerHTML='<tr><td>API not connected</td></tr>'}
+}
+async function loadProducts(){
+try{
+let r = await fetch('/supermarket'); let j = await r.json();
+let items = j.products||j;
+document.getElementById('totalProducts').innerText = items.length;
+document.getElementById('prodBody').innerHTML = items.map(p=>`<tr><td>${p.name||p.title}</td><td>KES ${p.price||0}</td><td>${p.stock||'-'}</td></tr>`).join('') || '<tr><td colspan=3>No products</td></tr>';
+}catch(e){document.getElementById('prodBody').innerHTML='<tr><td>API not connected</td></tr>'}
+}
+loadOrders(); loadProducts();
+fetch('/riders').then(r=>r.json()).then(j=>{document.getElementById('riders').innerText = (j.riders||j).length || 0}).catch(()=>{});
+</script>
+</body>
+</html>
