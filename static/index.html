@@ -1,91 +1,17 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LONMA ORBIT - Control Center</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:Inter,system-ui,sans-serif}
-body{background:#0f172a;color:#fff}
-.header{background:#1e293b;padding:16px 24px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #334155}
-.header img{width:42px;height:42px;border-radius:10px;background:#fff;object-fit:contain}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:24px}
-.card{background:#1e293b;padding:20px;border-radius:16px;border:1px solid #334155}
-.card h3{color:#94a3b8;font-size:13px;text-transform:uppercase}
-.card .num{font-size:28px;font-weight:800;margin-top:8px}
-.tabs{display:flex;gap:8px;padding:0 24px}
-.tab{padding:10px 18px;background:#1e293b;border-radius:10px;cursor:pointer;border:1px solid #334155}
-.tab.active{background:#3b82f6;border-color:#3b82f6}
-.section{padding:24px}
-table{width:100%;background:#1e293b;border-radius:16px;border-collapse:collapse;overflow:hidden}
-th,td{padding:14px 16px;text-align:left;border-bottom:1px solid #334155}
-th{color:#94a3b8;font-size:12px;text-transform:uppercase}
-.status{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700}
-.Delivered{background:#065f46;color:#6ee7b7}
-.In\ Transit{background:#78350f;color:#fcd34d}
-.Processing{background:#1e40af;color:#93c5fd}
-@media(max-width:800px){.stats{grid-template-columns:repeat(2,1fr)}}
-</style>
-</head>
-<body>
-<div class="header">
-<img src="/static/logo.png" onerror="this.src='https://via.placeholder.com/42'">
-<div>
-<div style="font-weight:800;font-size:18px">LONMA ORBIT</div>
-<div style="color:#94a3b8;font-size:12px">Delivery & Supermarket OS • app.lonmaorbit.co.ke</div>
-</div>
-</div>
-
-<div class="stats">
-<div class="card"><h3>Total Orders</h3><div class="num" id="totalOrders">-</div></div>
-<div class="card"><h3>Products</h3><div class="num" id="totalProducts">-</div></div>
-<div class="card"><h3>Riders Online</h3><div class="num" id="totalRiders">-</div></div>
-<div class="card"><h3>Revenue (KES)</h3><div class="num" id="totalRev">-</div></div>
-</div>
-
-<div class="tabs">
-<div class="tab active" onclick="loadTab('orders')">📦 Orders</div>
-<div class="tab" onclick="loadTab('supermarket')">🛒 Supermarket</div>
-<div class="tab" onclick="loadTab('riders')">🏍️ Riders</div>
-<div class="tab" onclick="loadTab('payments')">💳 Payments</div>
-</div>
-
-<div class="section" id="content">Loading...</div>
-
-<script>
-let current='orders';
-async function fetchJSON(url){const r=await fetch(url);return r.json()}
-async function loadTab(tab){
-current=tab;
-document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-event?.target?.classList?.add('active');
-const c=document.getElementById('content');
-c.innerHTML='Loading...';
-if(tab==='orders'){
- const d=await fetchJSON('/orders');
- c.innerHTML=`<table><tr><th>ID</th><th>Customer</th><th>Total</th><th>Status</th></tr>${d.orders.map(o=>`<tr><td>${o.id}</td><td>${o.customer}</td><td>KES ${o.total}</td><td><span class="status ${o.status}">${o.status}</span></td></tr>`).join('')}</table>`;
-}else if(tab==='supermarket'){
- const d=await fetchJSON('/supermarket');
- c.innerHTML=`<table><tr><th>Product</th><th>Price</th><th>Stock</th></tr>${d.products.map(p=>`<tr><td>${p.name}</td><td>KES ${p.price}</td><td>${p.stock}</td></tr>`).join('')}</table>`;
-}else if(tab==='riders'){
- const d=await fetchJSON('/riders');
- c.innerHTML=`<table><tr><th>Rider</th><th>Status</th></tr>${d.riders.map(r=>`<tr><td>${r.name}</td><td>${r.status}</td></tr>`).join('')}</table>`;
 }else{
  const d=await fetchJSON('/payments');
- c.innerHTML=`<table><tr><th>Payment</th><th>Order</th><th>Amount</th><th>Method</th></tr>${d.payments.map(p=>`<tr><td>${p.id}</td><td>${p.order}</td><td>KES ${p.amount}</td><td>${p.method}</td></tr>`).join('')}</table>`;
+ c.innerHTML=`
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+ <div>
+ <h3 style="margin-bottom:12px">M-Pesa STK Push</h3>
+ <div style="background:#1e293b;padding:20px;border-radius:16px;border:1px solid #334155">
+ <input id="mpesaPhone" placeholder="07XX XXX XXX" style="width:100%;padding:12px;border-radius:10px;background:#0f172a;border:1px solid #334155;color:#fff;margin-bottom:10px">
+ <input id="mpesaAmount" placeholder="Amount KES" type="number" style="width:100%;padding:12px;border-radius:10px;background:#0f172a;border:1px solid #334155;color:#fff;margin-bottom:10px">
+ <input id="mpesaOrder" placeholder="Order ID e.g ORD-10284" style="width:100%;padding:12px;border-radius:10px;background:#0f172a;border:1px solid #334155;color:#fff;margin-bottom:12px">
+ <button onclick="sendMpesa()" style="width:100%;padding:12px;background:#22c55e;border:0;border-radius:10px;color:#000;font-weight:800;cursor:pointer">Send M-Pesa Request</button>
+ <div id="mpesaResult" style="margin-top:12px;color:#86efac"></div>
+ </div>
+ </div>
+ <table><tr><th>Payment</th><th>Order</th><th>Amount</th><th>Method</th></tr>${d.payments.map(p=>`<tr><td>${p.id}</td><td>${p.order}</td><td>KES ${p.amount}</td><td>${p.method}</td></tr>`).join('')}</table>
+ </div>`;
 }
-}
-async function loadStats(){
- const o=await fetchJSON('/orders');
- const s=await fetchJSON('/supermarket');
- const r=await fetchJSON('/riders');
- document.getElementById('totalOrders').textContent=o.orders.length;
- document.getElementById('totalProducts').textContent=s.products.length;
- document.getElementById('totalRiders').textContent=r.riders.length;
- document.getElementById('totalRev').textContent=o.orders.reduce((a,b)=>a+b.total,0).toLocaleString();
- loadTab('orders');
-}
-loadStats();
-</script>
-</body>
-</html>
