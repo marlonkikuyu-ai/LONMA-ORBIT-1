@@ -1,17 +1,57 @@
-let SUPERS=JSON.parse(localStorage.getItem('lo_supers')||`[
-{"name":"Naivas Thika Town","loc":"Thika Town CBD","fee":80},
-{"name":"Naivas Mountain Mall","loc":"Mountain Mall, Thika Rd","fee":120},
-{"name":"Quickmart Kiganjo","loc":"Kiganjo Rd, Thika","fee":70},
-{"name":"Quickmart Thika","loc":"Thika Arcade","fee":80},
-{"name":"Carrefour Thika - Ananas Mall","loc":"Ananas Mall","fee":100},
-{"name":"Carrefour Thika - Juja","loc":"Juja City Mall","fee":150},
-{"name":"Magunas Thika","loc":"Gatitu, Thika","fee":90},
-{"name":"Choppies Thika","loc":"Thika Bazaar","fee":70},
-{"name":"Eastmatt Thika","loc":"Eastmatt, Thika","fee":80},
-{"name":"Cleanshelf Thika","loc":"Mama Ngina St","fee":60},
-{"name":"Mathai Supermarket","loc":"Makongeni, Thika","fee":50},
-{"name":"Khetias Thika","loc":"Kenyatta Highway","fee":90},
-{"name":"Naivas Juja","loc":"Juja Town","fee":130},
-{"name":"Quickmart Ruiru","loc":"Ruiru Town","fee":140},
-{"name":"Carrefour Ruiru","loc":"Ruiru Mall","fee":150}
-]`);
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LONMA ORBIT</title><style>
+:root{--bg:#060d1d;--c:#111d35;--l:#1e2f52;--b:#2f81ff;--t:#e6f0ff;--m:#8aa0c8;--r:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}body{background:var(--bg);color:var(--t)}
+.top{height:60px;background:var(--c);border-bottom:1px solid var(--l);display:flex;align-items:center;justify-content:space-between;padding:0 14px}
+.card{background:var(--c);border:1px solid var(--l);border-radius:16px;padding:14px}
+.tabbar{display:flex;gap:6px;padding:0 14px;overflow:auto}.tab{padding:8px 14px;background:var(--c);border:1px solid var(--l);border-radius:99px;cursor:pointer;font-size:12px}.tab.on{background:#00f5ff;color:#000;font-weight:800}
+.view{padding:14px}table{width:100%;border-collapse:collapse;background:var(--c);border:1px solid var(--l);border-radius:16px;overflow:hidden}th,td{padding:10px;border-bottom:1px solid var(--l);font-size:12px}th{color:var(--m);font-size:10px}
+input,select{width:100%;padding:11px;border-radius:10px;border:1px solid var(--l);background:#070e1e;color:#fff;margin-bottom:7px}
+.btn{width:100%;padding:11px;border-radius:10px;border:0;background:#2f81ff;color:#fff;font-weight:800;cursor:pointer}.btn-g{background:#00f5ff;color:#000}
+.pay-box{background:#0c1a33!important;border:1px solid #1e3a6a!important}.pay-box input,.pay-box select{background:#070e1e!important;color:#fff!important;border:1px solid #204079!important}
+.grid2{display:grid;grid-template-columns:1fr 340px;gap:12px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+</style></head><body>
+<div class="top"><div><b>LONMA ORBIT</b> <small style="color:var(--m)">Thika OS</small></div><div style="color:#5ee9b5">● LIVE</div></div>
+<div class="tabbar"><div class="tab on" onclick="T('orders',this)">Orders</div><div class="tab" onclick="T('supers',this)">Supermarkets (15)</div><div class="tab" onclick="T('shop',this)">Products</div><div class="tab" onclick="T('pay',this)">M-Pesa</div></div>
+<div class="view" id="V">Loading...</div>
+<script>
+let CATS=["Bakery","Dairy","Drinks","Fruits","Vegetables","Meat","Household","Snacks","Flour"];
+let SUPERS=[
+{name:"Naivas Thika Town",loc:"CBD",fee:80},
+{name:"Naivas Mountain Mall",loc:"Mountain Mall",fee:120},
+{name:"Quickmart Kiganjo",loc:"Kiganjo Rd",fee:70},
+{name:"Quickmart Thika",loc:"Thika Arcade",fee:80},
+{name:"Carrefour Ananas Mall",loc:"Ananas Mall",fee:100},
+{name:"Carrefour Juja",loc:"Juja City Mall",fee:150},
+{name:"Magunas Thika",loc:"Gatitu",fee:90},
+{name:"Choppies Thika",loc:"Bazaar",fee:70},
+{name:"Eastmatt Thika",loc:"Eastmatt",fee:80},
+{name:"Cleanshelf Thika",loc:"Mama Ngina",fee:60},
+{name:"Mathai Supermarket",loc:"Makongeni",fee:50},
+{name:"Khetias Thika",loc:"Kenyatta Hwy",fee:90},
+{name:"Naivas Juja",loc:"Juja Town",fee:130},
+{name:"Quickmart Ruiru",loc:"Ruiru Town",fee:140},
+{name:"Carrefour Ruiru",loc:"Ruiru Mall",fee:150}
+];
+let PRODS=[
+{name:"Milk 500ml",price:120,stock:60,cat:"Dairy",super:"Naivas Thika Town"},
+{name:"Bread 400g",price:70,stock:100,cat:"Bakery",super:"Quickmart Kiganjo"},
+{name:"Coca-Cola 1L",price:120,stock:80,cat:"Drinks",super:"Carrefour Ananas Mall"}
+];
+async function API(u){try{let r=await fetch(u);return await r.json()}catch{return {orders:[{id:"ORD-10284",customer:"Sarah Wanjiku",total:1850,status:"Delivered"},{id:"ORD-10283",customer:"James Omondi",total:4200,status:"In Transit"}],riders:[{name:"Peter Rider",status:"Online"}]}}}
+async function T(t,el){
+if(el){document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));el.classList.add("on")}
+let v=document.getElementById("V");
+let orders=(await API("/orders")).orders;
+if(t=="orders"){
+v.innerHTML=`<div class="grid2"><table><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th></tr>${orders.map(o=>`<tr><td>${o.id}</td><td>${o.customer}</td><td>KES ${o.total}</td><td>${o.status}</td></tr>`).join("")}</table><div class="card"><b>+ New Order</b><br><br><input placeholder="Customer Name"><input type="number" placeholder="Total KES"><select>${SUPERS.map(s=>`<option>${s.name}</option>`).join("")}</select><button class="btn btn-g">Create Order</button></div></div>`;
+}else if(t=="supers"){
+v.innerHTML=`<div class="grid2"><table><tr><th>Supermarket</th><th>Location</th><th>Fee</th><th>Products</th></tr>${SUPERS.map(s=>`<tr><td><b>${s.name}</b></td><td>${s.loc}</td><td>KES ${s.fee}</td><td>${PRODS.filter(p=>p.super==s.name).length}</td></tr>`).join("")}</table><div class="card"><b>Add Supermarket</b><br><br><input id="sN" placeholder="Name"><input id="sL" placeholder="Location"><input id="sF" type="number" placeholder="Fee"><button class="btn btn-g" onclick="addS()">+ Add</button></div></div>`;
+}else if(t=="shop"){
+v.innerHTML=`<table><tr><th>Product</th><th>Category</th><th>Price</th><th>Super</th></tr>${PRODS.map(p=>`<tr><td>${p.name}</td><td>${p.cat}</td><td>KES ${p.price}</td><td>${p.super}</td></tr>`).join("")}</table>`;
+}else{
+v.innerHTML=`<div class="grid2"><div class="card pay-box"><b>M-Pesa Pay</b><br><br><input placeholder="Phone +254..."><input type="number" placeholder="Amount"><input placeholder="Order ID"><button class="btn btn-g">SEND PAYMENT REQUEST</button></div><div class="card"><b>Today Collections</b><h2 style="font-size:32px;margin:10px 0">KES 6,050</h2><div>M-Pesa: KES 4,200</div><div>Cash: KES 1,850</div><div>Fees: KES 200</div></div></div>`;
+}
+}
+function addS(){let n=document.getElementById("sN").value,l=document.getElementById("sL").value,f=document.getElementById("sF").value;if(!n)return alert("Enter name");SUPERS.push({name:n,loc:l,fee:parseInt(f)||100});T("supers",document.querySelectorAll(".tab")[1])}
+T("orders",document.querySelector(".tab"));
+</script></body></html>
