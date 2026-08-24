@@ -2,82 +2,127 @@
 <html>
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LONMA ORBIT - Full OS</title>
+<title>LONMA ORBIT</title>
 <style>
 :root{--bg:#070e1e;--c:#121d33;--l:#1f2d4d;--b:#2f81ff;--g:#00e676;--t:#dbeafe;--m:#8aa0c8}
-*{margin:0;padding:0;box-sizing:border-box;font-family:Inter,system-ui}
-body{background:var(--bg);color:var(--t)}
-.top{height:64px;background:var(--c);border-bottom:1px solid var(--l);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0}
-.stats{padding:16px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}body{background:var(--bg);color:var(--t)}
+.top{height:60px;background:var(--c);border-bottom:1px solid var(--l);display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px}
 @media(max-width:800px){.stats{grid-template-columns:1fr 1fr}}
-.card{background:linear-gradient(180deg,var(--c),#0f1a31);border:1px solid var(--l);border-radius:18px;padding:18px}
-.card h2{font-size:28px;margin-top:8px}.card small{color:var(--m);text-transform:uppercase;letter-spacing:.7px;font-size:11px}
-.tabs{padding:0 16px;display:flex;gap:8px;overflow:auto}
-.tab{padding:10px 16px;background:var(--c);border:1px solid var(--l);border-radius:999px;cursor:pointer;font-size:13px}
+.card{background:var(--c);border:1px solid var(--l);border-radius:16px;padding:16px}
+.tabbar{padding:0 14px;display:flex;gap:8px;overflow:auto}
+.tab{padding:10px 16px;background:var(--c);border:1px solid var(--l);border-radius:99px;cursor:pointer;font-size:13px}
 .tab.on{background:var(--b);border-color:var(--b);color:#fff;font-weight:800}
-.view{padding:16px}
-table{width:100%;border-collapse:collapse;background:var(--c);border:1px solid var(--l);border-radius:18px;overflow:hidden}
-th,td{padding:14px;border-bottom:1px solid var(--l);font-size:13px}th{color:var(--m);font-size:10px;text-transform:uppercase}
-.b{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:800}.ok{background:#022c22;color:#5ee9b5}.run{background:#3b2306;color:#ffcc66}.wait{background:#1e1b4b;color:#a5b4fc}
-.grid2{display:grid;grid-template-columns:360px 1fr;gap:14px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
-input{width:100%;padding:13px;border-radius:12px;border:1px solid var(--l);background:var(--bg);color:#fff;margin-bottom:10px}
-.btn{width:100%;padding:13px;border-radius:12px;border:0;background:var(--g);font-weight:900;cursor:pointer}
+.view{padding:14px}
+table{width:100%;border-collapse:collapse;background:var(--c);border:1px solid var(--l);border-radius:16px;overflow:hidden}
+th,td{padding:12px;border-bottom:1px solid var(--l);font-size:13px}th{color:var(--m);font-size:10px;text-transform:uppercase}
+input,select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--l);background:var(--bg);color:#fff;margin-bottom:8px}
+.btn{padding:12px 16px;border-radius:10px;border:0;background:var(--b);color:#fff;font-weight:800;cursor:pointer}
+.btn-g{background:var(--g);color:#000}
+.grid2{display:grid;grid-template-columns:1fr 360px;gap:12px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<div class="top">
-<div style="display:flex;gap:10px;align-items:center"><img src="/static/logo.png" style="width:38px;height:38px;border-radius:10px;background:#fff" onerror="this.style.display='none'"><div><b>LONMA ORBIT</b><div style="font-size:10px;color:var(--m)">Thika • Full Delivery OS</div></div></div>
-<div style="font-size:12px;color:#5ee9b5">● LIVE • app.lonmaorbit.co.ke</div>
-</div>
-
+<div class="top"><div><b>LONMA ORBIT</b> <small style="color:var(--m)">• Thika Delivery OS</small></div><div style="color:#5ee9b5;font-size:12px">● LIVE</div></div>
 <div class="stats">
-<div class="card"><small>Total Orders</small><h2 id="s1">-</h2><div style="font-size:11px;color:var(--m);margin-top:6px">Today +2</div></div>
-<div class="card"><small>Revenue</small><h2 id="s2">-</h2><div style="font-size:11px;color:var(--m);margin-top:6px">KES • M-Pesa + Cash</div></div>
-<div class="card"><small>Products</small><h2 id="s3">-</h2><div style="font-size:11px;color:var(--m);margin-top:6px">Supermarket live</div></div>
-<div class="card"><small>Active Riders</small><h2 id="s4">-</h2><div style="font-size:11px;color:var(--m);margin-top:6px">Online now</div></div>
+<div class="card"><small>TOTAL ORDERS</small><h2 id="a1">-</h2></div>
+<div class="card"><small>REVENUE KES</small><h2 id="a2">-</h2></div>
+<div class="card"><small>PRODUCTS</small><h2 id="a3">-</h2></div>
+<div class="card"><small>SUPERMARKETS</small><h2 id="a4">-</h2></div>
 </div>
-
-<div class="tabs">
-<div class="tab on" onclick="tab('orders',this)">📦 Orders</div>
-<div class="tab" onclick="tab('shop',this)">🛒 Supermarket</div>
-<div class="tab" onclick="tab('riders',this)">🏍️ Riders</div>
-<div class="tab" onclick="tab('pay',this)">💳 M-Pesa</div>
-<div class="tab" onclick="tab('analytics',this)">📊 Analytics</div>
+<div class="tabbar">
+<div class="tab on" onclick="show('orders',this)">📦 Orders</div>
+<div class="tab" onclick="show('super',this)">🛒 Supermarkets</div>
+<div class="tab" onclick="show('riders',this)">🏍️ Riders</div>
+<div class="tab" onclick="show('pay',this)">💳 M-Pesa</div>
 </div>
-
-<div class="view" id="v">Loading...</div>
+<div class="view" id="view"></div>
 
 <script>
-async function j(u){let r=await fetch(u);return r.json()}
-function col(s){if(s=='Delivered')return'ok';if(s=='In Transit')return'run';return'wait'}
-async function tab(t,e){
-document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));e.classList.add('on');
-let v=document.getElementById('v');
+let supermarkets = JSON.parse(localStorage.getItem('loma_super')||'[{"name":"Naivas Thika","location":"Thika Town","items":45,"status":"Active"},{"name":"Quickmart - Kiganjo","location":"Kiganjo Rd","items":32,"status":"Active"}]');
+let products = [{"name":"Fresh Milk 500ml","price":120,"stock":50,"super":"Naivas Thika"},{"name":"White Bread 400g","price":70,"stock":100,"super":"Quickmart - Kiganjo"}];
+
+function saveSuper(){localStorage.setItem('loma_super',JSON.stringify(supermarkets))}
+
+async function api(u){try{let r=await fetch(u);return await r.json()}catch(e){return {orders:[],riders:[]}}}
+
+async function show(t,el){
+if(el){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));el.classList.add('on')}
+let v=document.getElementById('view');
 if(t=='orders'){
- let d=await j('/orders');
- v.innerHTML=`<div class="grid2"><table><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th><th>Action</th></tr>${d.orders.map(o=>`<tr><td><b>${o.id}</b></td><td>${o.customer}</td><td>KES ${o.total}</td><td><span class="b ${col(o.status)}">${o.status}</span></td><td><button onclick="alert('Assign rider to ${o.id}')" style="padding:6px 10px;border-radius:8px;border:0;background:#2f81ff;color:#fff;cursor:pointer">Assign</button></td></tr>`).join('')}</table><div class="card"><b>+ New Order</b><br><br><input id="c" placeholder="Customer Name"><input id="tt" type="number" placeholder="Total KES"><button class="btn" onclick="alert('Add Order API next')">Create Order</button><div style="margin-top:12px;font-size:11px;color:var(--m)">Next: we will connect to DB to save</div></div></div>`;
-}else if(t=='shop'){
- let d=await j('/supermarket');
- v.innerHTML=`<table><tr><th>Product</th><th>Price</th><th>Stock</th><th></th></tr>${d.products.map(p=>`<tr><td>${p.name}</td><td>KES ${p.price}</td><td>${p.stock}</td><td>🟢</td></tr>`).join('')}</table>`;
-}else if(t=='riders'){
- let d=await j('/riders');
- v.innerHTML=`<div class="grid2"><table><tr><th>Rider</th><th>Status</th><th>Trips</th></tr>${d.riders.map(r=>`<tr><td>${r.name}</td><td><span class="b ok">${r.status}</span></td><td>12 today</td></tr>`).join('')}</table><div class="card"><b>Live Map</b><div style="height:200px;background:#070e1e;border:1px dashed var(--l);border-radius:12px;margin-top:10px;display:flex;align-items:center;justify-content:center;color:var(--m)">Thika Town • Riders moving</div></div></div>`;
-}else if(t=='pay'){
- v.innerHTML=`<div class="grid2"><div class="card"><b>STK Push - Lipa na M-Pesa</b><br><br><input id="ph" placeholder="07..."><input id="am" type="number" placeholder="Amount"><input id="od" placeholder="Order ID"><button class="btn" onclick="go()">SEND M-PESA</button><div id="rr" style="margin-top:12px;color:#5ee9b5"></div></div><div class="card"><b>Recent Payments</b><div style="margin-top:12px;color:var(--m)">Will show after real Daraja keys added.<br><br>Current: TEST MODE (no real money moves).<br>To go live: Add MPESA_CONSUMER_KEY in Render Env.</div></div></div>`;
-}else{
- let d=await j('/orders');
- let tot=d.orders.reduce((a,b)=>a+b.total,0);
- v.innerHTML=`<div class="stats" style="padding:0"><div class="card"><small>Today Revenue</small><h2>KES ${tot.toLocaleString()}</h2></div><div class="card"><small>Completion</small><h2>98.5%</h2></div><div class="card"><small>Avg Delivery</small><h2>22 min</h2></div><div class="card"><small>M-Pesa Success</small><h2>99.1%</h2></div></div>`;
+ let d=await api('/orders');
+ v.innerHTML=`<table><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th></tr>${d.orders.map(o=>`<tr><td><b>${o.id}</b></td><td>${o.customer}</td><td>KES ${o.total}</td><td>${o.status}</td></tr>`).join('')}</table>`;
+}
+else if(t=='super'){
+ v.innerHTML=`<div class="grid2">
+ <div>
+ <table><tr><th>Supermarket</th><th>Location</th><th>Items</th><th>Status</th><th></th></tr>
+ ${supermarkets.map((s,i)=>`<tr><td><b>${s.name}</b></td><td>${s.location}</td><td>${s.items}</td><td style="color:#5ee9b5">${s.status}</td><td><button onclick="delSuper(${i})" style="background:#ef4444;border:0;padding:6px 10px;border-radius:8px;color:#fff;cursor:pointer">X</button></td></tr>`).join('')}
+ </table>
+ <br><table><tr><th>Product</th><th>Price</th><th>Stock</th><th>Supermarket</th></tr>
+ ${products.map(p=>`<tr><td>${p.name}</td><td>KES ${p.price}</td><td>${p.stock}</td><td>${p.super}</td></tr>`).join('')}
+ </table>
+ </div>
+ <div>
+ <div class="card">
+ <b>Add Supermarket</b><br><br>
+ <input id="sName" placeholder="Name e.g Carrefour Thika">
+ <input id="sLoc" placeholder="Location e.g Makongeni">
+ <input id="sItems" type="number" placeholder="Number of Items e.g 120">
+ <button class="btn btn-g" onclick="addSuper()">+ Add Supermarket</button>
+ </div>
+ <div class="card" style="margin-top:12px">
+ <b>Add Product to Supermarket</b><br><br>
+ <input id="pName" placeholder="Product Name e.g Sugar 2kg">
+ <input id="pPrice" type="number" placeholder="Price KES">
+ <input id="pStock" type="number" placeholder="Stock">
+ <select id="pSuper">${supermarkets.map(s=>`<option>${s.name}</option>`).join('')}</select>
+ <button class="btn" onclick="addProduct()">+ Add Product</button>
+ </div>
+ </div>
+ </div>`;
+}
+else if(t=='riders'){
+ let d=await api('/riders');
+ v.innerHTML=`<table><tr><th>Rider</th><th>Status</th></tr>${d.riders.map(r=>`<tr><td>${r.name}</td><td>${r.status}</td></tr>`).join('')}</table>`;
+}
+else{
+ v.innerHTML=`<div class="card" style="max-width:380px"><b>M-Pesa STK Push</b><br><br><input id="ph" placeholder="07..."><input id="am" type="number" placeholder="Amount"><input id="od" placeholder="Order ID"><button class="btn btn-g" onclick="pay()">SEND</button><div id="rr" style="margin-top:10px;color:#5ee9b5"></div></div>`;
 }
 }
-async function go(){
+
+function addSuper(){
+ let n=document.getElementById('sName').value;
+ let l=document.getElementById('sLoc').value;
+ let it=document.getElementById('sItems').value||0;
+ if(!n){alert('Enter supermarket name');return}
+ supermarkets.push({name:n,location:l,items:parseInt(it),status:'Active'});
+ saveSuper(); show('super',document.querySelectorAll('.tab')[1]);
+}
+function delSuper(i){supermarkets.splice(i,1);saveSuper();show('super',document.querySelectorAll('.tab')[1]);}
+function addProduct(){
+ let n=document.getElementById('pName').value;
+ let pr=document.getElementById('pPrice').value;
+ let st=document.getElementById('pStock').value;
+ let su=document.getElementById('pSuper').value;
+ if(!n)return alert('Enter product');
+ products.push({name:n,price:pr,stock:st,super:su});
+ show('super',document.querySelectorAll('.tab')[1]);
+}
+async function pay(){
  let ph=document.getElementById('ph').value,am=document.getElementById('am').value,od=document.getElementById('od').value;
- document.getElementById('rr').innerHTML='Sending...';
- let r=await fetch('/pay/mpesa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:ph,amount:parseInt(am),order_id:od||'ORD-TEST'})});
- let j2=await r.json();
- document.getElementById('rr').innerHTML=`✅ Sent to ${j2.phone} - KES ${j2.amount}`;
+ let r=await fetch('/pay/mpesa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:ph,amount:parseInt(am),order_id:od})});
+ let j=await r.json();
+ document.getElementById('rr').innerHTML=`✅ Sent to ${j.phone}`;
 }
-(async()=>{let o=await j('/orders'),s=await j('/supermarket'),r=await j('/riders');document.getElementById('s1').innerText=o.orders.length;document.getElementById('s2').innerText='KES '+o.orders.reduce((a,b)=>a+b.total,0).toLocaleString();document.getElementById('s3').innerText=s.products.length;document.getElementById('s4').innerText=r.riders.length;tab('orders',document.querySelector('.tab'));})();
+(async()=>{
+ let o=await api('/orders');let s=await api('/supermarket');let r=await api('/riders');
+ document.getElementById('a1').innerText=o.orders.length;
+ document.getElementById('a2').innerText='KES '+o.orders.reduce((a,b)=>a+b.total,0).toLocaleString();
+ document.getElementById('a3').innerText=products.length;
+ document.getElementById('a4').innerText=supermarkets.length;
+ show('orders',document.querySelector('.tab'));
+})();
 </script>
 </body>
 </html>
