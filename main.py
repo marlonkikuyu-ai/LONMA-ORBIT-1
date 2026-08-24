@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+import os
 
 app = FastAPI()
 
@@ -12,56 +13,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+if os.path.isdir("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 def root():
-    return {"status": "ok", "app": "LONMA ORBIT", "url": "https://app.lonmaorbit.co.ke"}
+    return {"status": "ok", "app": "LONMA ORBIT"}
 
 @app.get("/www")
 def www():
-    return FileResponse("static/index.html")
+    if os.path.exists("static/index.html"):
+        return FileResponse("static/index.html")
+    return {"error": "static/index.html missing - upload it"}
 
 @app.get("/orders")
 def orders():
-    return {
-        "orders": [
-            {"id": "ORD-10284", "customer": "Sarah Wanjiku", "total": 1850, "status": "Delivered"},
-            {"id": "ORD-10283", "customer": "James Omondi", "total": 4200, "status": "In Transit"},
-            {"id": "ORD-10282", "customer": "Emily Akinyi", "total": 950, "status": "Processing"},
-            {"id": "ORD-10281", "customer": "David Kimani", "total": 2120, "status": "Delivered"},
-            {"id": "ORD-10280", "customer": "Grace Njeri", "total": 720, "status": "Cancelled"}
-        ]
-    }
+    return {"orders": [
+        {"id": "ORD-10284", "customer": "Sarah Wanjiku", "total": 1850, "status": "Delivered"},
+        {"id": "ORD-10283", "customer": "James Omondi", "total": 4200, "status": "In Transit"},
+        {"id": "ORD-10282", "customer": "Emily Akinyi", "total": 950, "status": "Processing"}
+    ]}
 
 @app.get("/supermarket")
 def supermarket():
-    return {
-        "products": [
-            {"name": "Fresh Milk 1L", "price": 120, "stock": 50},
-            {"name": "Bread", "price": 70, "stock": 100},
-            {"name": "Eggs Tray", "price": 450, "stock": 30},
-            {"name": "Sugar 2kg", "price": 320, "stock": 80},
-            {"name": "Cooking Oil 1L", "price": 280, "stock": 60},
-            {"name": "Rice 5kg", "price": 650, "stock": 40}
-        ]
-    }
+    return {"products": [
+        {"name": "Fresh Milk 1L", "price": 120, "stock": 50},
+        {"name": "Bread", "price": 70, "stock": 100},
+        {"name": "Eggs Tray", "price": 450, "stock": 30}
+    ]}
 
 @app.get("/riders")
 def riders():
-    return {
-        "riders": [
-            {"id": 1, "name": "John Mwangi", "status": "online"},
-            {"id": 2, "name": "Peter Ochieng", "status": "busy"},
-            {"id": 3, "name": "Ali Hassan", "status": "online"}
-        ]
-    }
+    return {"riders": [{"id": 1, "name": "John Mwangi", "status": "online"}]}
 
 @app.get("/payments")
 def payments():
-    return {
-        "payments": [
-            {"id": "PAY-001", "order": "ORD-10284", "method": "M-Pesa", "amount": 1850, "status": "Paid"},
-            {"id": "PAY-002", "order": "ORD-10283", "method": "Card", "amount": 4200, "status": "Paid"}
-        ]
-    }
+    return {"payments": []}
