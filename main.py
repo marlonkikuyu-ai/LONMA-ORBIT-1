@@ -1,51 +1,24 @@
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
-import os
+from pydantic import BaseModel
 
-app = FastAPI()
+class PayRequest(BaseModel):
+    phone: str
+    amount: int
+    order_id: str
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.post("/pay/mpesa")
+def mpesa_pay(req: PayRequest):
+    clean_phone = req.phone.replace("+", "").replace(" ", "")
+    if clean_phone.startswith("0"):
+        clean_phone = "254" + clean_phone[1:]
+    return {
+        "status": "sent",
+        "message": f"STK Push sent to {req.phone}",
+        "phone": clean_phone,
+        "amount": req.amount,
+        "order_id": req.order_id,
+        "checkout_id": f"CHK-{req.order_id}"
+    }
 
-if os.path.isdir("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-
-@app.get("/")
-def root():
-    return {"status": "ok", "app": "LONMA ORBIT"}
-
-@app.get("/www")
-def www():
-    if os.path.exists("static/index.html"):
-        return FileResponse("static/index.html")
-    return {"error": "static/index.html missing - upload it"}
-
-@app.get("/orders")
-def orders():
-    return {"orders": [
-        {"id": "ORD-10284", "customer": "Sarah Wanjiku", "total": 1850, "status": "Delivered"},
-        {"id": "ORD-10283", "customer": "James Omondi", "total": 4200, "status": "In Transit"},
-        {"id": "ORD-10282", "customer": "Emily Akinyi", "total": 950, "status": "Processing"}
-    ]}
-
-@app.get("/supermarket")
-def supermarket():
-    return {"products": [
-        {"name": "Fresh Milk 1L", "price": 120, "stock": 50},
-        {"name": "Bread", "price": 70, "stock": 100},
-        {"name": "Eggs Tray", "price": 450, "stock": 30}
-    ]}
-
-@app.get("/riders")
-def riders():
-    return {"riders": [{"id": 1, "name": "John Mwangi", "status": "online"}]}
-
-@app.get("/payments")
-def payments():
-    return {"payments": []}
+@app.get("/pay/status/{checkout_id}")
+def pay_status(checkout_id: str):
+    return {"checkout_id": checkout_id, "status": "Paid", "method": "M-Pesa"}
