@@ -1,52 +1,34 @@
-import os
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
+import os
 
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-os.makedirs(STATIC_DIR, exist_ok=True)
-
-try:
-    if os.path.exists(STATIC_DIR):
-        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-except Exception as e:
-    print(f"Static mount failed: {e}")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
-def root():
-    return {"status": "ok", "service": "LONMA ORBIT", "path": BASE_DIR}
+def root(): return {"status":"ok"}
 
 @app.get("/www")
-def serve_www():
-    index_path = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    return {"error": "index.html not found", "expected": index_path, "files": os.listdir(STATIC_DIR) if os.path.exists(STATIC_DIR) else []}
+def www(): return FileResponse("static/index.html")
 
 @app.get("/orders")
-def get_orders():
-    return {"orders": []}
+def orders():
+    return {"orders":[
+        {"id":"ORD-10284","customer":"Sarah Wanjiku","total":1850,"status":"Delivered"},
+        {"id":"ORD-10283","customer":"James Omondi","total":4200,"status":"In Transit"},
+        {"id":"ORD-10282","customer":"Emily Akinyi","total":950,"status":"Processing"}
+    ]}
 
 @app.get("/supermarket")
-def get_supermarket():
-    return {"products": []}
-
-@app.get("/payments")
-def get_payments():
-    return {"payments": []}
+def products():
+    return {"products":[
+        {"name":"Fresh Milk 1L","price":120,"stock":50},
+        {"name":"Bread","price":70,"stock":100},
+        {"name":"Eggs Tray","price":450,"stock":30}
+    ]}
 
 @app.get("/riders")
-def get_riders():
-    return {"riders": []}
+def riders(): return {"riders":[{"name":"Rider 1"},{"name":"Rider 2"}]}
+@app.get("/payments")
+def payments(): return {"payments":[]}
