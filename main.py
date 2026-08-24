@@ -16,20 +16,24 @@ app.add_middleware(
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
+os.makedirs(STATIC_DIR, exist_ok=True)
 
-if os.path.exists(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+try:
+    if os.path.exists(STATIC_DIR):
+        app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+except Exception as e:
+    print(f"Static mount failed: {e}")
 
 @app.get("/")
 def root():
-    return {"status": "ok", "service": "LONMA ORBIT"}
+    return {"status": "ok", "service": "LONMA ORBIT", "path": BASE_DIR}
 
 @app.get("/www")
 def serve_www():
     index_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
-    return {"error": "static/index.html not found"}
+    return {"error": "index.html not found", "expected": index_path, "files": os.listdir(STATIC_DIR) if os.path.exists(STATIC_DIR) else []}
 
 @app.get("/orders")
 def get_orders():
@@ -46,7 +50,3 @@ def get_payments():
 @app.get("/riders")
 def get_riders():
     return {"riders": []}
-
-@app.get("/delivery")
-def get_delivery():
-    return {"deliveries": []}
