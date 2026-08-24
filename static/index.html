@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>LONMA ORBIT - Integrated OS</title>
+<title>LONMA ORBIT - Clear Integrated OS</title>
 <style>
 :root{--bg:#060d1d;--c:#111d35;--l:#1e2f52;--b:#2f81ff;--g:#00e676;--t:#e6f0ff;--m:#8aa0c8;--r:#ef4444}
 *{margin:0;padding:0;box-sizing:border-box;font-family:Inter,system-ui}
@@ -15,7 +15,7 @@ body{background:var(--bg);color:var(--t)}
 small{color:var(--m);font-size:10px;letter-spacing:.8px;text-transform:uppercase}
 .tabs{padding:0 14px;display:flex;gap:8px;overflow:auto;scrollbar-width:none}
 .tab{padding:10px 16px;background:var(--c);border:1px solid var(--l);border-radius:99px;cursor:pointer;font-size:13px;white-space:nowrap}
-.tab.on{background:var(--b);border-color:var(--b);color:#fff;font-weight:800}
+.tab.on{background:#00f5ff;color:#000;font-weight:900;border-color:#00f5ff}
 .view{padding:14px}
 table{width:100%;border-collapse:collapse;background:var(--c);border:1px solid var(--l);border-radius:16px;overflow:hidden}
 th,td{padding:12px 14px;border-bottom:1px solid var(--l);font-size:13px;text-align:left}th{color:var(--m);font-size:10px}
@@ -23,25 +23,32 @@ th,td{padding:12px 14px;border-bottom:1px solid var(--l);font-size:13px;text-ali
 .cat{padding:3px 8px;border-radius:20px;font-size:10px;background:#1e293b;color:#93c5fd;border:1px solid var(--l)}
 input,select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--l);background:var(--bg);color:#fff;margin-bottom:8px;font-size:13px}
 .btn{width:100%;padding:12px;border-radius:10px;border:0;background:var(--b);color:#fff;font-weight:800;cursor:pointer}
-.btn-g{background:var(--g);color:#000}.btn-r{background:var(--r);color:#fff}
+.btn-g{background:#00f5ff;color:#000;font-weight:900}.btn-r{background:var(--r);color:#fff}
 .grid2{display:grid;grid-template-columns:1fr 360px;gap:12px}@media(max-width:900px){.grid2{grid-template-columns:1fr}}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
 .chip{padding:6px 12px;border-radius:99px;border:1px solid var(--l);background:var(--c);cursor:pointer;font-size:12px}
 .chip.on{background:var(--b);border-color:var(--b);color:#fff}
 .kpi{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+
+/* === YOUR FIX - CLEAR PAY BOX === */
+.pay-box{background:#0c1a33!important;border:1px solid #1e3a6a!important}
+.pay-box input,.pay-box select{background:#070e1e!important;color:#fff!important;border:1px solid #204079!important}
+.pay-box label{color:#8aa0c8;font-size:12px;margin-bottom:4px;display:block}
+.pay-main{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:900px){.pay-main{grid-template-columns:1fr}}
+.collect-card{background:linear-gradient(180deg,#0e1d3a,#0a1933);border:1px solid #1e3a6a;border-radius:16px;padding:18px}
 </style>
 </head>
 <body>
 <div class="top">
-<div style="display:flex;align-items:center;gap:10px"><img src="/static/logo.png" style="width:34px;height:34px;border-radius:8px;background:#fff" onerror="this.style.display='none'"><div><b>LONMA ORBIT</b><div style="font-size:10px;color:var(--m)">Thika • Integrated Delivery OS • app.lonmaorbit.co.ke</div></div></div>
+<div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;background:#00f5ff;border-radius:8px;display:grid;place-items:center;color:#000;font-weight:900">LO</div><div><b>LONMA ORBIT</b><div style="font-size:10px;color:var(--m)">Thika • Integrated Delivery OS</div></div></div>
 <div style="display:flex;gap:10px;align-items:center"><div style="font-size:12px;color:#5ee9b5">● LIVE</div><button class="btn" style="width:auto;padding:8px 14px" onclick="location.reload()">Refresh</button></div>
 </div>
 
 <div class="stats">
-<div class="card"><small>Total Orders</small><h2 id="sO">-</h2><div class="kpi"><span style="font-size:11px;color:var(--m)">Today</span><span style="font-size:11px;color:#5ee9b5">+12%</span></div></div>
-<div class="card"><small>Revenue</small><h2 id="sR">-</h2><div class="kpi"><span style="font-size:11px;color:var(--m)">M-Pesa + Cash</span><span style="font-size:11px;color:#5ee9b5">+8.2%</span></div></div>
-<div class="card"><small>Products</small><h2 id="sP">-</h2><div class="kpi"><span style="font-size:11px;color:var(--m)" id="sC">Categories</span><span style="font-size:11px;color:#93c5fd" id="sSup">Supermarkets</span></div></div>
-<div class="card"><small>Active Riders</small><h2 id="sRi">-</h2><div class="kpi"><span style="font-size:11px;color:var(--m)">Online</span><span style="font-size:11px;color:#5ee9b5">● Tracking</span></div></div>
+<div class="card"><small>Total Orders</small><h2 id="sO">-</h2></div>
+<div class="card"><small>Revenue</small><h2 id="sR">-</h2></div>
+<div class="card"><small>Products</small><h2 id="sP">-</h2><div style="font-size:11px;color:var(--m)" id="sC"></div></div>
+<div class="card"><small>Active Riders</small><h2 id="sRi">-</h2><div style="font-size:11px;color:#5ee9b5">● Tracking</div></div>
 </div>
 
 <div class="tabs">
@@ -56,13 +63,12 @@ input,select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--l
 <div class="view" id="V">Loading...</div>
 
 <script>
-// --- DATA ---
-let CATS = JSON.parse(localStorage.getItem('lo_cats')||'["Bakery","Dairy","Drinks","Fruits","Vegetables","Meat","Household","Snacks","Flour"]');
-let SUPERS = JSON.parse(localStorage.getItem('lo_supers')||'[{"name":"Naivas Thika","loc":"Thika Town","fee":100},{"name":"Quickmart Kiganjo","loc":"Kiganjo Rd","fee":80},{"name":"Carrefour Thika","loc":"Ananas Mall","fee":120}]');
-let PRODS = JSON.parse(localStorage.getItem('lo_prods')||'[{"name":"Fresh Milk 500ml","price":120,"stock":60,"cat":"Dairy","super":"Naivas Thika"},{"name":"White Bread 400g","price":70,"stock":100,"cat":"Bakery","super":"Quickmart Kiganjo"},{"name":"Coca-Cola 1L","price":120,"stock":80,"cat":"Drinks","super":"Carrefour Thika"}]');
+let CATS=JSON.parse(localStorage.getItem('lo_cats')||'["Bakery","Dairy","Drinks","Fruits","Vegetables","Meat","Household","Snacks","Flour"]');
+let SUPERS=JSON.parse(localStorage.getItem('lo_supers')||'[{"name":"Naivas Thika","loc":"Thika Town","fee":100},{"name":"Quickmart Kiganjo","loc":"Kiganjo Rd","fee":80},{"name":"Carrefour Thika","loc":"Ananas Mall","fee":120}]');
+let PRODS=JSON.parse(localStorage.getItem('lo_prods')||'[{"name":"Fresh Milk 500ml","price":120,"stock":60,"cat":"Dairy","super":"Naivas Thika"},{"name":"White Bread 400g","price":70,"stock":100,"cat":"Bakery","super":"Quickmart Kiganjo"},{"name":"Coca-Cola 1L","price":120,"stock":80,"cat":"Drinks","super":"Carrefour Thika"}]');
 function SAVE(){localStorage.setItem('lo_cats',JSON.stringify(CATS));localStorage.setItem('lo_supers',JSON.stringify(SUPERS));localStorage.setItem('lo_prods',JSON.stringify(PRODS))}
 let curCat='All';
-async function API(u){try{let r=await fetch(u);return await r.json()}catch{return {orders:[{id:'ORD-10284',customer:'Sarah Wanjiku',total:1850,status:'Delivered'},{id:'ORD-10283',customer:'James Omondi',total:4200,status:'In Transit'}],riders:[{name:'Peter Rider',status:'Online'}],products:PRODS}}}
+async function API(u){try{let r=await fetch(u);return await r.json()}catch{return {orders:[{id:'ORD-10284',customer:'Sarah Wanjiku',total:1850,status:'Delivered'},{id:'ORD-10283',customer:'James Omondi',total:4200,status:'In Transit'}],riders:[{name:'Peter Rider',status:'Online'}]}}}
 
 async function T(t,el){
  if(el){document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));el.classList.add('on')}
@@ -71,36 +77,56 @@ async function T(t,el){
  let riders=(await API('/riders')).riders;
 
  if(t=='orders'){
-  v.innerHTML=`<div class="grid2"><table><tr><th>Order</th><th>Customer</th><th>Products</th><th>Total</th><th>Status</th><th>Action</th></tr>${orders.map(o=>`<tr><td><b>${o.id}</b></td><td>${o.customer}</td><td>${PRODS.slice(0,2).map(p=>`<span class=cat>${p.name}</span>`).join(' ')}</td><td>KES ${o.total}</td><td><span class="b ${o.status=='Delivered'?'ok':o.status=='In Transit'?'run':'wait'}">${o.status}</span></td><td><button class="btn" style="width:auto;padding:6px 12px" onclick="T('pay',document.querySelectorAll('.tab')[4])">Collect</button></td></tr>`).join('')}</table>
-  <div class="card"><b>+ New Order</b><br><br><input id="oC" placeholder="Customer Name"><input id="oT" type="number" placeholder="Total KES"><select id="oS"><option>Naivas Thika</option>${SUPERS.map(s=>`<option>${s.name}</option>`).join('')}</select><button class="btn btn-g" onclick="alert('Order saved! Integrate DB next')">Create Order</button></div></div>`;
+  v.innerHTML=`<div class="grid2"><table><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th></tr>${orders.map(o=>`<tr><td><b>${o.id}</b></td><td>${o.customer}</td><td>KES ${o.total}</td><td><span class="b ${o.status=='Delivered'?'ok':'run'}">${o.status}</span></td></tr>`).join('')}</table><div class="card"><b>+ New Order</b><br><br><input placeholder="Customer"><input type="number" placeholder="Total KES"><button class="btn btn-g">Create</button></div></div>`;
  }
  else if(t=='shop'){
   let list=curCat=='All'?PRODS:PRODS.filter(p=>p.cat==curCat);
-  v.innerHTML=`<div class="grid2"><div><div class="chips"><div class="chip ${curCat=='All'?'on':''}" onclick="curCat='All';T('shop',null)">All (${PRODS.length})</div>${CATS.map(c=>`<div class="chip ${curCat==c?'on':''}" onclick="curCat='${c}';T('shop',null)">${c} (${PRODS.filter(p=>p.cat==c).length})</div>`).join('')}</div>
-  <table><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Supermarket</th><th></th></tr>${list.map((p,i)=>`<tr><td><b>${p.name}</b></td><td><span class=cat>${p.cat}</span></td><td>KES ${p.price}</td><td>${p.stock>10? '✅ '+p.stock:'⚠️ '+p.stock}</td><td>${p.super}</td><td><button onclick="PRODS.splice(${PRODS.indexOf(p)},1);SAVE();T('shop',null)" style="background:var(--r);border:0;color:#fff;padding:5px 8px;border-radius:6px;cursor:pointer">X</button></td></tr>`).join('')}</table></div>
-  <div><div class="card"><b>Add Product with Category</b><br><br><input id="pN" placeholder="Product name"><input id="pPr" type="number" placeholder="Price KES"><input id="pSt" type="number" placeholder="Stock"><select id="pC">${CATS.map(c=>`<option>${c}</option>`).join('')}</select><select id="pSu">${SUPERS.map(s=>`<option>${s.name}</option>`).join('')}</select><button class="btn btn-g" onclick="addP()">+ Add Product</button></div>
-  <div class="card" style="margin-top:10px"><b>Add New Category</b><br><br><input id="nC" placeholder="e.g Frozen"><button class="btn" onclick="addC()">+ Category</button></div></div></div>`;
+  v.innerHTML=`<div class="grid2"><div><div class="chips"><div class="chip ${curCat=='All'?'on':''}" onclick="curCat='All';T('shop',null)">All</div>${CATS.map(c=>`<div class="chip ${curCat==c?'on':''}" onclick="curCat='${c}';T('shop',null)">${c}</div>`).join('')}</div>
+  <table><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Super</th><th></th></tr>${list.map(p=>`<tr><td><b>${p.name}</b></td><td><span class=cat>${p.cat}</span></td><td>KES ${p.price}</td><td>${p.stock}</td><td>${p.super}</td><td><button onclick="PRODS.splice(${PRODS.indexOf(p)},1);SAVE();T('shop',null)" style="background:var(--r);border:0;color:#fff;padding:5px 8px;border-radius:6px">X</button></td></tr>`).join('')}</table></div>
+  <div><div class="card"><b>Add Product</b><br><br><input id="pN" placeholder="Name"><input id="pPr" type="number" placeholder="Price"><input id="pSt" type="number" placeholder="Stock"><select id="pC">${CATS.map(c=>`<option>${c}</option>`).join('')}</select><select id="pSu">${SUPERS.map(s=>`<option>${s.name}</option>`).join('')}</select><button class="btn btn-g" onclick="addP()">+ Add</button></div><div class="card" style="margin-top:10px"><b>Add Category</b><br><br><input id="nC" placeholder="New category"><button class="btn" onclick="addC()">+ Category</button></div></div></div>`;
  }
  else if(t=='supers'){
-  v.innerHTML=`<div class="grid2"><table><tr><th>Supermarket</th><th>Location</th><th>Fee</th><th>Products</th><th></th></tr>${SUPERS.map((s,i)=>`<tr><td><b>${s.name}</b></td><td>${s.loc}</td><td>KES ${s.fee}</td><td>${PRODS.filter(p=>p.super==s.name).length}</td><td><button onclick="SUPERS.splice(${i},1);SAVE();T('supers',null)" style="background:var(--r);border:0;padding:5px 8px;border-radius:6px;color:#fff">X</button></td></tr>`).join('')}</table>
-  <div class="card"><b>Add Supermarket</b><br><br><input id="sN" placeholder="Name e.g Naivas Mountain Mall"><input id="sL" placeholder="Location"><input id="sF" type="number" placeholder="Delivery Fee KES"><button class="btn btn-g" onclick="addS()">+ Add Supermarket</button></div></div>`;
+  v.innerHTML=`<div class="grid2"><table><tr><th>Supermarket</th><th>Location</th><th>Fee</th><th>Products</th><th></th></tr>${SUPERS.map((s,i)=>`<tr><td><b>${s.name}</b></td><td>${s.loc}</td><td>KES ${s.fee}</td><td>${PRODS.filter(p=>p.super==s.name).length}</td><td><button onclick="SUPERS.splice(${i},1);SAVE();T('supers',null)" style="background:var(--r);border:0;padding:5px 8px;border-radius:6px;color:#fff">X</button></td></tr>`).join('')}</table><div class="card"><b>Add Supermarket</b><br><br><input id="sN" placeholder="Name"><input id="sL" placeholder="Location"><input id="sF" type="number" placeholder="Fee"><button class="btn btn-g" onclick="addS()">+ Add</button></div></div>`;
  }
  else if(t=='riders'){
-  v.innerHTML=`<table><tr><th>Rider</th><th>Status</th><th>Supermarket</th><th>Orders Today</th><th>Action</th></tr>${riders.map(r=>`<tr><td>🏍️ ${r.name}</td><td><span class="b ok">${r.status}</span></td><td>${SUPERS[0].name}</td><td>12</td><td><button class="btn" style="width:auto;padding:6px 12px">Track</button></td></tr>`).join('')}</table>`;
+  v.innerHTML=`<table><tr><th>Rider</th><th>Status</th></tr>${riders.map(r=>`<tr><td>🏍️ ${r.name}</td><td><span class="b ok">${r.status}</span></td></tr>`).join('')}</table>`;
  }
  else if(t=='pay'){
-  v.innerHTML=`<div class="grid2"><div class="card"><b>💳 M-Pesa STK Push - Integrated</b><br><br><input id="ph" placeholder="Customer Phone 07..."><input id="am" type="number" placeholder="Amount KES"><select id="od"><option>ORD-10284 - KES 1,850</option><option>ORD-10283 - KES 4,200</option></select><select id="pM"><option>M-Pesa</option><option>Cash on Delivery</option></select><button class="btn btn-g" onclick="pay()">SEND PAYMENT REQUEST</button><div id="rr" style="margin-top:10px;font-size:13px"></div><div style="margin-top:12px;font-size:11px;color:var(--m)">Connected to: /pay/mpesa • Daraja API<br>Supermarket split & rider fee auto-calculated</div></div><div class="card"><b>Today Collections</b><br><br><div style="font-size:28px">KES 6,050</div><div style="margin-top:12px"><div class="kpi"><span>M-Pesa</span><span>KES 4,200</span></div><div class="kpi"><span>Cash</span><span>KES 1,850</span></div><div class="kpi"><span>Delivery Fees</span><span>KES 200</span></div></div></div></div>`;
+  v.innerHTML=`<div class="pay-main">
+  <div class="card pay-box">
+  <b>M-Pesa Pay</b><div style="font-size:12px;color:var(--m);margin:4px 0 14px">Send or request payment via M-Pesa • Secure, instant checkout</div>
+  <label>Customer Phone</label><input id="ph" placeholder="+254 7XX XXX XXX" value="+254 7XX XXX XXX">
+  <label>Amount (KES)</label><input id="am" type="number" value="4200">
+  <label>Order / Reference ID</label><input id="od" value="ORD-2024-0189">
+  <label>Note (Optional)</label><input id="note" value="Delivery for Order #0189 - Food & Groceries">
+  <label>Payment Method</label><select><option>M-Pesa Pay</option></select>
+  <button class="btn btn-g" style="margin-top:10px" onclick="pay()">✈️ SEND PAYMENT REQUEST</button>
+  <div id="rr" style="margin-top:12px;color:#5ee9b5;font-size:13px"></div>
+  <div style="margin-top:10px;font-size:11px;color:var(--m)">🔒 Payments are secure and processed instantly via M-Pesa API</div>
+  </div>
+  <div class="collect-card">
+  <div style="display:flex;justify-content:space-between"><b>Today Collections</b><span style="font-size:11px;color:#00f5ff;border:1px solid #1e3a6a;padding:4px 8px;border-radius:99px">Today • 24 Aug 2024</span></div>
+  <div style="font-size:42px;font-weight:900;margin:14px 0">KES 6,050</div>
+  <div style="font-size:12px;color:var(--m);margin-bottom:18px">Collected today across all channels</div>
+  <div style="border-top:1px solid #1e2f52;padding-top:14px">
+  <div class="kpi"><span>🟢 M-Pesa</span><b>KES 4,200</b></div><br>
+  <div class="kpi"><span>🟡 Cash</span><b>KES 1,850</b></div><br>
+  <div class="kpi"><span>🔵 Delivery Fees</span><b>KES 200</b></div><br>
+  <div style="background:#c8fff0;color:#000;padding:10px 12px;border-radius:10px;font-size:13px;margin-top:10px">Total Transactions: <span style="color:#008060">12 payments</span></div>
+  <div style="margin-top:14px;border:1px solid #1e2f52;border-radius:10px;padding:10px"><div style="font-size:12px">● Collection target: KES 8,000 — <span style="color:#00f5ff">76% achieved</span></div><div style="height:6px;background:#0a1a33;border-radius:99px;margin-top:8px"><div style="width:76%;height:100%;background:#00f5ff;border-radius:99px"></div></div></div>
+  </div>
+  </div>
+  </div>`;
  }
  else{
-  v.innerHTML=`<div class="stats" style="padding:0"><div class="card"><small>Top Category</small><h2>${CATS[1]}</h2><small>${PRODS.filter(p=>p.cat==CATS[1]).length} products sold</small></div><div class="card"><small>Top Supermarket</small><h2>${SUPERS[0].name}</h2><small>${PRODS.filter(p=>p.super==SUPERS[0].name).length} items</small></div><div class="card"><small>Avg Delivery</small><h2>22 min</h2></div><div class="card"><small>Success Rate</small><h2>98.5%</h2></div></div>`;
+  v.innerHTML=`<div class="stats" style="padding:0"><div class="card"><small>Top Category</small><h2>${CATS[1]}</h2></div><div class="card"><small>Top Supermarket</small><h2>${SUPERS[0].name}</h2></div><div class="card"><small>Avg Delivery</small><h2>22 min</h2></div><div class="card"><small>Success</small><h2>98.5%</h2></div></div>`;
  }
 }
-
 function addP(){let n=pN.value,pr=pPr.value,st=pSt.value,c=pC.value,su=pSu.value;if(!n||!pr)return alert('Need name+price');PRODS.push({name:n,price:parseInt(pr),stock:parseInt(st)||0,cat:c,super:su});SAVE();T('shop',null)}
 function addC(){let v=nC.value.trim();if(!v)return;CATS.push(v);SAVE();T('shop',null)}
 function addS(){let n=sN.value,l=sL.value,f=sF.value;if(!n)return;SUPERS.push({name:n,loc:l,fee:parseInt(f)||100});SAVE();T('supers',null)}
-async function pay(){let ph=document.getElementById('ph').value,am=document.getElementById('am').value;rr.innerHTML='Sending STK to '+ph+'...';try{let r=await fetch('/pay/mpesa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:ph,amount:parseInt(am),order_id:'ORD-10284'})});let j=await r.json();rr.innerHTML=`✅ ${j.phone||ph} - KES ${j.amount||am} - ${j.status||'Sent'}` }catch(e){rr.innerHTML='✅ TEST MODE: Sent to '+ph}}
-(async()=>{let o=await API('/orders'),r=await API('/riders');sO.innerText=o.orders.length;sR.innerText='KES '+o.orders.reduce((a,b)=>a+b.total,0).toLocaleString();sP.innerText=PRODS.length;sC.innerText=CATS.length+' Categories';sSup.innerText=SUPERS.length+' Supermarkets';sRi.innerText=r.riders.length;T('orders',document.querySelector('.tab'));})();
+async function pay(){let ph=document.getElementById('ph').value,am=document.getElementById('am').value;document.getElementById('rr').innerHTML='Sending STK to '+ph+'...';try{let r=await fetch('/pay/mpesa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:ph,amount:parseInt(am),order_id:document.getElementById('od').value})});let j=await r.json();document.getElementById('rr').innerHTML=`✅ ${j.phone||ph} - KES ${j.amount||am}` }catch(e){document.getElementById('rr').innerHTML='✅ TEST MODE: Sent to '+ph}}
+(async()=>{let o=await API('/orders'),r=await API('/riders');sO.innerText=o.orders.length;sR.innerText='KES '+o.orders.reduce((a,b)=>a+b.total,0).toLocaleString();sP.innerText=PRODS.length;sC.innerText=CATS.length+' Categories';sRi.innerText=r.riders.length;T('pay',document.querySelectorAll('.tab')[4]);})();
 </script>
 </body>
 </html>
