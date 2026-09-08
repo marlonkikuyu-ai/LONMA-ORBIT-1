@@ -1,27 +1,25 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+app = FastAPI(title="LONMA ORBIT API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://lonmaorbit.co.ke", "https://themakers.co.ke", "https://app.lonmaorbit.co.ke"],
+    allow_origins=["*"],  # allow all for now, we restrict later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# FIX 1: Allow both GET and HEAD so Render health check passes
 @app.api_route("/", methods=["GET", "HEAD"])
-def home():
-    return {"status": "LONMA ORBIT API Live", "domain": "app.lonmaorbit.co.ke"}
+def root():
+    return {"message": "LONMA ORBIT API is Live", "url": "https://app.lonmaorbit.co.ke"}
 
 @app.api_route("/health", methods=["GET", "HEAD"])
-def health():
+def health_check():
     return {"status": "ok"}
 
-@app.get("/www")
-def www_page():
-    return {"www": "ok"}
-
-# your other routes...
+# Add your real routes below, make sure each function name is UNIQUE
+@app.get("/api/test")
+def test_api():
+    return {"test": "working"}
