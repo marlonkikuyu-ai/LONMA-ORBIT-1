@@ -1,31 +1,28 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from database import engine, Base
-import models
-from routes import orders
-
-models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="LONMA ORBIT API")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.api_route("/", methods=["GET","HEAD"], operation_id="root_final")
-def root():
-    return {"app":"LONMA ORBIT","status":"Live Thika"}
+@app.get("/")
+def home():
+    return {"status": "LONMA ORBIT is Live", "services": ["PA Systems", "UI/UX", "Photography", "Podcast", "Activation", "Websites", "Excel & PowerPoint"]}
 
-@app.api_route("/health", methods=["GET","HEAD"], operation_id="health_final")
-def health():
-    return {"ok": True}
-
-@app.get("/favicon.ico", include_in_schema=False)
-def fav(): return JSONResponse({}, status_code=204)
-
-app.include_router(orders.router, prefix="/api", tags=["orders"])
+@app.get("/services")
+def get_services():
+    return [
+        {"id": 1, "name": "Public Address Systems"},
+        {"id": 2, "name": "UI/UX Design"},
+        {"id": 3, "name": "Tour Guide Services"},
+        {"id": 4, "name": "Photography Services"},
+        {"id": 5, "name": "Instore/Market Activation"},
+        {"id": 6, "name": "Podcast sessions"},
+        {"id": 7, "name": "Social Media & Website design"},
+        {"id": 8, "name": "Excel & PowerPoint"}
+    ]
