@@ -1,6 +1,4 @@
+# requirements.txt
 fastapi
 uvicorn
-sqlalchemy
 pydantic
-psycopg2-binary
-python-multipart
