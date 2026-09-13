@@ -24,14 +24,14 @@ def get_token():
         return None
 
 PRODUCTS=[
- {"id":1,"name":"Ajab Maize Flour 2kg","price":175,"old":195,"store":"Naivas","cat":"grocery","stock":50,"rate":4.8,"sold":234,"emoji":"🌽"},
- {"id":2,"name":"Brookside Milk 500ml","price":65,"old":75,"store":"Naivas","cat":"dairy","stock":100,"rate":4.9,"sold":512,"emoji":"🥛"},
- {"id":3,"name":"Coca Cola 1.25L","price":100,"old":120,"store":"Quickmart","cat":"drinks","stock":80,"rate":4.7,"sold":320,"emoji":"🥤"},
- {"id":4,"name":"Omo Detergent 1kg","price":285,"old":320,"store":"Carrefour","cat":"home","stock":40,"rate":4.6,"sold":89,"emoji":"🧴"},
- {"id":5,"name":"Tomatoes Fresh 1kg","price":80,"old":100,"store":"Quickmart","cat":"fresh","stock":60,"rate":4.9,"sold":445,"emoji":"🍅"},
- {"id":6,"name":"White Bread 400g","price":60,"old":70,"store":"Naivas","cat":"dairy","stock":70,"rate":4.8,"sold":210,"emoji":"🍞"},
- {"id":7,"name":"Pishori Rice 2kg","price":350,"old":400,"store":"Carrefour","cat":"grocery","stock":30,"rate":4.9,"sold":156,"emoji":"🍚"},
- {"id":8,"name":"Geisha Soap 150g","price":55,"old":65,"store":"Magunas","cat":"care","stock":90,"rate":4.5,"sold":98,"emoji":"🧼"},
+ {"id":1,"name":"Ajab Maize Flour 2kg","price":175,"old":195,"store":"Naivas","cat":"grocery","stock":50,"rate":4.8,"sold":234,"emoji":"🌽","color":"#FFF8E1"},
+ {"id":2,"name":"Brookside Milk 500ml","price":65,"old":75,"store":"Naivas","cat":"dairy","stock":100,"rate":4.9,"sold":512,"emoji":"🥛","color":"#E3F2FD"},
+ {"id":3,"name":"Coca Cola 1.25L","price":100,"old":120,"store":"Quickmart","cat":"drinks","stock":80,"rate":4.7,"sold":320,"emoji":"🥤","color":"#FFEBEE"},
+ {"id":4,"name":"Omo Detergent 1kg","price":285,"old":320,"store":"Carrefour","cat":"home","stock":40,"rate":4.6,"sold":89,"emoji":"🧴","color":"#E8F5E9"},
+ {"id":5,"name":"Tomatoes Fresh 1kg","price":80,"old":100,"store":"Quickmart","cat":"fresh","stock":60,"rate":4.9,"sold":445,"emoji":"🍅","color":"#FFF3E0"},
+ {"id":6,"name":"White Bread 400g","price":60,"old":70,"store":"Naivas","cat":"dairy","stock":70,"rate":4.8,"sold":210,"emoji":"🍞","color":"#FFF8E1"},
+ {"id":7,"name":"Pishori Rice 2kg","price":350,"old":400,"store":"Carrefour","cat":"grocery","stock":30,"rate":4.9,"sold":156,"emoji":"🍚","color":"#F3E5F5"},
+ {"id":8,"name":"Geisha Soap 150g","price":55,"old":65,"store":"Magunas","cat":"care","stock":90,"rate":4.5,"sold":98,"emoji":"🧼","color":"#E0F7FA"},
 ]
 RIDERS=[
  {"id":1,"name":"John Mwangi","motor":"KMEZ 123A","status":"available","rating":4.9,"location":"Kajiado","trips":12},
@@ -43,108 +43,141 @@ ORDERS=[]
 def smart_ai_reply(message, cart_count=0):
     msg=message.lower().strip()
     if any(w in msg for w in ["hello","hi","hey","jambo","habari"]):
-        return "Hello! 👋 I'm LONMA AI, your smart shopping assistant!\n\nI know prices from 5 stores: Naivas, Quickmart, Carrefour, Chandarana & Magunas.\n\nI can:\n• Find cheapest products\n• Check stock\n• Track rider delivery\n• Help you order\n\nWhat do you need today? Try 'cheapest flour' or 'help me'"
-    if any(w in msg for w in ["help","assist","what can you","how to","guide"]):
-        return "I can help you with:\n\n🛒 PRODUCTS: Say 'flour', 'milk', 'bread', 'soda' - I'll find cheapest price\n\n💰 PRICES: 'cheapest flour' or 'compare milk'\n\n🏍️ DELIVERY: 'will you deliver?', 'rider time', 'delivery fee'\n\n📦 ORDER: 'how to order', 'my cart', 'checkout'\n\n💳 PAYMENT: 'M-Pesa', 'cash on delivery'\n\nJust type what you need! For example: 'Will you deliver to Kitengela?'"
-    if any(w in msg for w in ["deliver","delivery","bring","come","transport"]):
-        if "where" in msg or "location" in msg or "area" in msg:
-            return "Yes! We deliver to:\n\n📍 Kajiado Town\n📍 Kitengela\n📍 Rongai\n📍 Kiserian\n📍 Ongata Rongai\n\nDelivery in 30 minutes! Fee is KES 100.\n\nWe have 3 riders online now:\n• John Mwangi - KMEZ 123A - 4.9★ - Available\n• Peter Ochieng - 4.8★ - Delivering\n• Samuel Kiprop - 5.0★ - Available\n\nWhere should I deliver to?"
-        if "kitengela" in msg or "rongai" in msg or "kajiado" in msg:
-            return f"Yes! We deliver to {msg.title()}! 🏍️\n\nDelivery time: 30 minutes\nDelivery fee: KES 100\nRider will call you when near.\n\nAdd products to cart and checkout - rider will be assigned immediately!\n\nWhat do you want to order?"
-        return "Yes, we deliver! 🚚💨\n\n✅ We deliver in 30 minutes\n✅ Areas: Kajiado, Kitengela, Rongai\n✅ Fee: KES 100 only\n✅ 3 riders available now\n✅ Pay M-Pesa or Cash\n\nJust add items to cart and checkout. Where do you want delivery?"
-    if "yes" in msg and ("bring" in msg or "deliver" in msg or "on" in msg):
-        return "Great! Let's order! 🛒\n\n1. Add products from Best Deals (tap + button)\n2. Click Cart icon (bottom)\n3. Enter your location and M-Pesa number\n4. Click 'Place Order'\n\nRider will be assigned in 30 seconds and deliver in 30 minutes!\n\nWhat do you want? Flour? Milk? Bread?"
-    if "will you" in msg or "can you" in msg:
-        if "deliver" in msg:
-            return "Yes, we will deliver! 🏍️ 30 minutes, KES 100 fee. We cover Kajiado, Kitengela, Rongai. Add to cart and checkout - rider comes immediately!"
-        return "Yes, I can help! Tell me what you need - flour, milk, delivery info, or how to order?"
-    if "cheapest" in msg or "cheap" in msg or "lowest" in msg:
-        for p in PRODUCTS:
-            if any(word in msg for word in p["name"].lower().split()[:2]):
-                cheapest=min([x for x in PRODUCTS if p["cat"]==x["cat"]], key=lambda x: x["price"]) if len([x for x in PRODUCTS if p["cat"]==x["cat"]])>1 else p
-                return f"Cheapest {p['name'].split()[0]} is {cheapest['name']} at KES {cheapest['price']} at {cheapest['store']} (was KES {cheapest['old']}) - {cheapest['stock']} in stock! ⭐{cheapest['rate']}\n\nTap + to add to cart!"
-        return "Here are cheapest items today:\n\n🌽 Flour 2kg - KES 175 Naivas (was 195)\n🥛 Milk 500ml - KES 65 Naivas (was 75)\n🍅 Tomatoes 1kg - KES 80 Quickmart (was 100)\n🍞 Bread - KES 60 Naivas\n\nAll have 10-20% OFF! Which do you want?"
-    if "flour" in msg or "maize" in msg or "unga" in msg:
-        return "Ajab Maize Flour 2kg:\n\n💰 KES 175 at Naivas (cheapest!)\n💰 KES 178 at Quickmart\n💰 KES 172 at Carrefour (best deal!)\n\n📦 50 packs in stock\n⭐ 4.8 stars, 234 sold\n\nGood for ugali! Tap + on flour card to add to cart. Want me to add it?"
+        return "Hello! 👋 I'm LONMA AI!\n\nI know prices from 5 stores: Naivas, Quickmart, Carrefour, Chandarana & Magunas.\n\nWhat do you need today?"
+    if any(w in msg for w in ["help","assist","guide"]):
+        return "I can help:\n\n🛒 Find cheapest products\n💰 Compare prices\n🏍️ Delivery info\n📦 How to order\n💳 M-Pesa payment\n\nTry: 'Will you deliver?' or 'Cheapest flour'"
+    if any(w in msg for w in ["deliver","delivery","bring"]):
+        if "where" in msg or "area" in msg:
+            return "We deliver to:\n📍 Kajiado Town\n📍 Kitengela\n📍 Rongai\n📍 Kiserian\n\n30 mins, KES 100 fee, 3 riders online!"
+        return "Yes! We deliver in 30 mins 🏍️\n\nAreas: Kajiado, Kitengela, Rongai\nFee: KES 100\n3 riders online\n\nWhere to deliver?"
+    if "yes" in msg and ("bring" in msg or "on" in msg):
+        return "Great! 🛒\n1. Tap + on products\n2. Click Cart bottom\n3. Enter location + M-Pesa\n4. Place Order\n\nRider in 30 mins! What do you want?"
+    if "flour" in msg or "unga" in msg:
+        return "Ajab Flour 2kg:\n💰 KES 175 Naivas\n💰 KES 172 Carrefour (best!)\n📦 50 packs, ⭐4.8\nTap + to add!"
     if "milk" in msg or "maziwa" in msg:
-        return "Brookside Milk 500ml:\n\n💰 KES 65 Naivas\n💰 KES 62 Chandarana (cheapest!)\n📦 100 packs fresh today\n⭐ 4.9 stars, 512 sold\n\nFresh daily milk! Goes well with bread KES 60. Add to cart?"
-    if "bread" in msg or "mkate" in msg:
-        return "White Bread 400g:\n\n💰 KES 60 Naivas (fresh)\n📦 70 loaves available\n⭐ 4.8 stars\n\nSoft fresh bread! Best with milk and eggs. Tap + to add!"
-    if "tomato" in msg or "nyanya" in msg:
-        return "Tomatoes Fresh 1kg:\n\n💰 KES 80 Quickmart (was KES 100)\n📦 60kg farm fresh today\n⭐ 4.9 stars, 445 sold\n\nFarm fresh! Great for stew. Add to cart?"
-    if "soda" in msg or "coke" in msg or "drink" in msg:
-        return "Coca Cola 1.25L:\n\n💰 KES 100 Quickmart\n💰 KES 99 Magunas (cheapest)\n📦 80 bottles chilled\n⭐ 4.7 stars\n\nChilled! Add to cart?"
-    if "omo" in msg or "detergent" in msg or "soap" in msg:
-        return "Omo Detergent 1kg KES 285 at Carrefour (cheapest, was 320) - 40 packs. Geisha Soap 150g KES 55 Magunas. Need household items?"
-    if "rider" in msg or "delivery time" in msg or "how long" in msg:
-        return "Rider info 🏍️:\n\n⏱️ Delivery: 30 minutes\n💰 Fee: KES 100\n📍 Areas: Kajiado, Kitengela, Rongai\n👥 Riders: 3 online\n\n• John KMEZ 123A - 4.9★ - Available - Kajiado\n• Peter KMFA 456B - 4.8★ - Delivering - Kitengela\n• Samuel KMEB 789C - 5.0★ - Available - Rongai\n\nRider calls you when 2 mins away!"
-    if "cart" in msg or "order" in msg or "checkout" in msg or "buy" in msg:
-        return f"You have {cart_count} items in cart.\n\nTo order:\n1. Tap + on products to add\n2. Click Cart icon bottom\n3. Enter location + M-Pesa number\n4. Click 'Place Order'\n\nRider assigned in 30 seconds!\n\nNeed help adding something?"
-    if "price" in msg or "how much" in msg or "cost" in msg:
-        return "Tell me which product! For example:\n• 'flour price'\n• 'milk price'\n• 'cheapest bread'\n\nI compare 5 supermarkets to give you cheapest!"
-    if "stock" in msg or "available" in msg or "left" in msg:
-        stock_info="\n".join([f"• {p['emoji']} {p['name']}: {p['stock']} left at {p['store']}" for p in PRODUCTS[:5]])
-        return f"Current stock:\n\n{stock_info}\n\nAll fresh today! Which do you need?"
-    if "payment" in msg or "mpesa" in msg or "pay" in msg or "cash" in msg:
-        return "Payment options:\n\n💚 Lipa na M-Pesa: Enter 2547... number, STK push sent\n💵 Cash on Delivery: Pay rider when he delivers\n\nBoth work! M-Pesa is faster. Which do you prefer?"
-    if "thank" in msg or "thanks" in msg or "asante" in msg:
-        return "You're welcome! 😊 Happy to help!\n\nNeed anything else? Flour, milk, delivery info? I'm here 24/7!"
+        return "Brookside Milk 500ml:\n💰 KES 65 Naivas\n💰 KES 62 Chandarana\n📦 100 fresh today, ⭐4.9"
+    if "rider" in msg or "how long" in msg:
+        return "🏍️ 30 mins delivery, KES 100\n3 riders:\n• John 4.9★ Available\n• Peter 4.8★ Delivering\n• Samuel 5.0★ Available"
+    if "cart" in msg or "order" in msg:
+        return f"You have {cart_count} items.\nTap + to add, then Cart icon > Place Order. Rider in 30 secs!"
+    if "cheapest" in msg:
+        return "Cheapest today:\n🌽 Flour 2kg KES 175\n🥛 Milk 500ml KES 65\n🍅 Tomatoes 1kg KES 80\n🍞 Bread KES 60\n10-20% OFF!"
     found=[]
     for p in PRODUCTS:
         if any(word in msg for word in p["name"].lower().split() if len(word)>2):
             found.append(p)
     if found:
         p=found[0]
-        return f"Found {p['name']}! {p['emoji']}\n\n💰 KES {p['price']} at {p['store']} (was KES {p['old']})\n📦 {p['stock']} in stock\n⭐ {p['rate']} stars, {p['sold']} sold\n\nTap + button on product card to add to cart! Need anything else?"
-    return f"I understood: '{message}'\n\nI'm LONMA AI - I can:\n\n• Find products: say 'flour' or 'milk'\n• Check cheapest: 'cheapest flour'\n• Delivery: 'will you deliver to Kitengela?'\n• Order help: 'how to order'\n\nTry asking:\n• 'Help me'\n• 'Will you deliver?'\n• 'Cheapest milk'\n• 'What is in stock?'"
+        return f"{p['name']} {p['emoji']}\n💰 KES {p['price']} at {p['store']} (was {p['old']})\n📦 {p['stock']} in stock ⭐{p['rate']}"
+    return f"I got: '{message}'\n\nTry:\n• 'Help me'\n• 'Will you deliver?'\n• 'Cheapest flour'\n• 'Milk price'"
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
     return HTMLResponse('''
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LONMA ORBIT</title>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>LONMA ORBIT • Fresh Groceries in 30 mins</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f6f7fb;--card:#fff;--text:#111;--muted:#666;--border:#eee}
-.dark{--bg:#0f0f0f;--card:#1c1c1e;--text:#fff;--muted:#aaa;--border:#2a2a2a}
-*{margin:0;padding:0;box-sizing:border-box;font-family:Arial} body{background:var(--bg);color:var(--text);padding-bottom:90px}
-.header{position:sticky;top:0;z-index:50;background:var(--card);border-bottom:1px solid var(--border)}
-.h-top{display:flex;justify-content:space-between;align-items:center;padding:10px 14px}
-.logo{width:110px;height:36px;background:#0A8EA8;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:14px}
-.icons{display:flex;gap:8px}.ic-btn{width:38px;height:38px;background:var(--bg);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;border:1px solid var(--border)}
-.h-location{padding:0 14px 10px;display:flex;align-items:center;gap:8px}.pin{width:32px;height:32px;background:#e6f7fa;border-radius:10px;display:flex;align-items:center;justify-content:center}.h-location b{font-size:13px}.h-location small{font-size:11px;color:var(--muted)}
-.search{padding:10px 14px;background:var(--card);display:flex;gap:10px}.search-box{flex:1;background:var(--bg);border-radius:14px;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border)}.search-box input{border:none;background:transparent;outline:none;flex:1;font-size:13px;color:var(--text)}.filter-btn{width:48px;height:48px;background:#111;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px}
-.hero{margin:12px 14px;background:linear-gradient(105deg,#0A8EA8 0%,#00c2a2 100%);border-radius:20px;padding:16px;display:flex;justify-content:space-between;align-items:center;color:#fff}
-.hero h2{font-size:17px;font-weight:800}.hero p{font-size:11px;opacity:0.9;margin-top:4px}.hero-btn{background:#fff;color:#0A8EA8;padding:10px 16px;border-radius:24px;font-weight:800;font-size:11px}
-.chips{display:flex;gap:8px;overflow-x:auto;padding:8px 14px}.chip{white-space:nowrap;padding:8px 14px;border-radius:20px;background:var(--card);border:1px solid var(--border);font-size:11px;font-weight:700;cursor:pointer}.chip.active{background:#111;color:#fff}
-.cats{display:flex;gap:12px;overflow-x:auto;padding:12px 14px}.cat{min-width:64px;text-align:center;cursor:pointer}.cat-icon{width:60px;height:60px;background:var(--card);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 4px 12px rgba(0,0,0,0.06);margin:0 auto;border:1px solid var(--border)}.cat.active.cat-icon{background:#0A8EA8;color:#fff}.cat b{font-size:10px;margin-top:6px;display:block}
-.section{padding:10px 14px}.sec-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.sec-head h3{font-size:15px;font-weight:800}.sec-head span{font-size:11px;color:#0A8EA8;font-weight:700}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.card{background:var(--card);border-radius:20px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.05);border:1px solid var(--border)}
-.card-img{height:120px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:42px;position:relative}.badge{position:absolute;top:10px;left:10px;background:#ff3b30;color:#fff;font-size:9px;font-weight:800;padding:4px 7px;border-radius:8px}.heart{position:absolute;top:10px;right:10px;width:30px;height:30px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px}
-.card-body{padding:10px}.store{font-size:8px;font-weight:800;color:#0A8EA8}.card-body h4{font-size:12px;font-weight:700;height:32px;overflow:hidden}.meta{font-size:10px;color:var(--muted);margin:4px 0}.price-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px}.price b{font-size:14px}.price small{font-size:10px;color:#999;text-decoration:line-through;margin-left:4px}.add-btn{width:32px;height:32px;background:#111;color:#fff;border:none;border-radius:11px;font-size:18px;font-weight:800;cursor:pointer}
-.h-scroll{display:flex;gap:10px;overflow-x:auto}.h-card{min-width:160px;background:var(--card);border-radius:18px;padding:10px;border:1px solid var(--border)}
-.bottom{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 0 12px;z-index:60}
-.tab{flex:1;text-align:center;cursor:pointer;position:relative}.tab-i{font-size:22px}.tab.active{color:#0A8EA8}.tab b{font-size:9px;display:block}.cart-dot{position:absolute;top:0;right:22px;background:#ff3b30;color:#fff;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center}
-#ai{position:fixed;bottom:92px;right:14px;width:58px;height:58px;background:#0A8EA8;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;box-shadow:0 8px 24px rgba(10,142,168,0.45);cursor:pointer;z-index:55}
-#aiChat{display:none;position:fixed;bottom:20px;left:12px;right:12px;max-width:420px;margin:0 auto;height:70vh;background:var(--card);border-radius:24px;box-shadow:0 20px 60px rgba(0,0,0,0.25);z-index:70;flex-direction:column;overflow:hidden;border:1px solid var(--border)} #aiChat.open{display:flex}
-.ai-h{background:#0A8EA8;color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center}.ai-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}.m{max-width:85%;padding:10px 14px;border-radius:18px;font-size:12px;line-height:1.4;white-space:pre-line}.m.u{align-self:flex-end;background:#0A8EA8;color:#fff;border-bottom-right-radius:6px}.m.b{align-self:flex-start;background:var(--card);border:1px solid var(--border);border-bottom-left-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.04)}.ai-in{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);background:var(--card)}.ai-in input{flex:1;padding:12px 16px;border-radius:24px;border:1px solid var(--border);background:var(--bg);color:var(--text);outline:none}.ai-in button{padding:12px 18px;background:#0A8EA8;color:#fff;border:none;border-radius:24px;font-weight:800}
-.quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.quick button{padding:6px 10px;background:#e0f7fa;color:#0A8EA8;border:1px solid #0A8EA8;border-radius:14px;font-size:10px;font-weight:700;cursor:pointer}
-.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);justify-content:center;align-items:flex-end;z-index:80}.modal.open{display:flex}
-.sheet{background:var(--card);width:100%;max-width:500px;margin:0 auto;border-radius:28px 28px 0 0;max-height:88vh;overflow-y:auto}.s-h{padding:18px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card)}.s-c{padding:16px}
-.btn{width:100%;padding:15px;border:none;border-radius:16px;font-weight:800;font-size:14px;cursor:pointer;margin-top:10px}.btn-green{background:#00a651;color:#fff}.btn-wa{background:#25D366;color:#fff}.input{width:100%;padding:13px 14px;border-radius:14px;border:1px solid var(--border);font-size:13px;margin:6px 0;background:var(--bg);color:var(--text)}
-.cart-i{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)}.ci{width:60px;height:60px;background:var(--bg);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px}
-.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:10px 18px;border-radius:24px;font-size:12px;font-weight:700;z-index:100;display:none}
+:root{--bg:#F8FAFB;--card:#FFFFFF;--text:#0F172A;--muted:#64748B;--border:#F1F5F9;--teal:#0A8EA8;--teal2:#06B6D4;--shadow:0 10px 30px rgba(0,0,0,0.06);--shadow2:0 20px 40px rgba(0,0,0,0.08)}
+.dark{--bg:#0B0E14;--card:#151A27;--text:#F8FAFC;--muted:#94A3B8;--border:#1E293B;--shadow:0 10px 30px rgba(0,0,0,0.3);--shadow2:0 20px 50px rgba(0,0,0,0.5)}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Plus Jakarta Sans',Arial, sans-serif}
+body{background:var(--bg);color:var(--text);padding-bottom:96px;transition:0.3s;-webkit-font-smoothing:antialiased}
+.header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,0.8);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border-bottom:1px solid var(--border)}
+.dark.header{background:rgba(21,26,39,0.85)}
+.h-top{display:flex;justify-content:space-between;align-items:center;padding:14px 16px}
+.logo{background:linear-gradient(135deg,#0A8EA8 0%,#06B6D4 50%,#0891B2 100%);color:#fff;padding:10px 18px;border-radius:14px;font-weight:800;font-size:14px;letter-spacing:0.5px;box-shadow:0 8px 20px rgba(10,142,168,0.3)}
+.icons{display:flex;gap:10px}.ic{width:44px;height:44px;background:var(--card);border:1px solid var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;box-shadow:var(--shadow);transition:0.2s}.ic:active{transform:scale(0.92)}
+.h-loc{padding:0 16px 14px;display:flex;align-items:center;gap:12px}
+.loc-icon{width:42px;height:42px;background:linear-gradient(135deg,#E0F7FA,#B2EBF2);border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.dark.loc-icon{background:linear-gradient(135deg,#164E63,#0E7490)}
+.h-loc b{font-size:13.5px;font-weight:700;letter-spacing:-0.2px}.h-loc small{font-size:11.5px;color:var(--muted);font-weight:600}
+.search-wrap{padding:0 16px 14px;display:flex;gap:12px}
+.search-box{flex:1;background:var(--card);border:1px solid var(--border);border-radius:18px;display:flex;align-items:center;gap:12px;padding:15px 18px;box-shadow:var(--shadow);transition:0.2s}
+.search-box:focus-within{border-color:var(--teal);box-shadow:0 0 0 4px rgba(10,142,168,0.1)}
+.search-box input{border:none;outline:none;background:transparent;flex:1;font-size:14px;font-weight:600;color:var(--text)}.search-box input::placeholder{color:var(--muted)}
+.filter{width:54px;height:54px;background:#0F172A;border-radius:18px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:var(--shadow);cursor:pointer}
+.dark.filter{background:#fff;color:#000}
+.hero{margin:6px 16px 18px;background:radial-gradient(100% 200% at 0% 0%,#06B6D4 0%,#0A8EA8 40%,#0E7490 100%);border-radius:28px;padding:22px 20px;display:flex;justify-content:space-between;align-items:center;color:#fff;position:relative;overflow:hidden;box-shadow:0 20px 40px rgba(10,142,168,0.25)}
+.hero::before{content:"";position:absolute;top:-40px;right:-40px;width:140px;height:140px;background:rgba(255,255,255,0.15);border-radius:50%;filter:blur(10px)}
+.hero h2{font-size:19px;font-weight:800;line-height:1.2;letter-spacing:-0.5px;position:relative}.hero p{font-size:12px;opacity:0.9;margin-top:6px;font-weight:600;position:relative}
+.hero-btn{background:#fff;color:#0A8EA8;padding:13px 22px;border-radius:100px;font-weight:800;font-size:12px;letter-spacing:0.3px;box-shadow:0 8px 20px rgba(0,0,0,0.15);cursor:pointer;transition:0.2s;position:relative}
+.hero-btn:active{transform:scale(0.96)}
+.chips{display:flex;gap:10px;overflow-x:auto;padding:2px 16px 14px;scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
+.chip{white-space:nowrap;padding:11px 18px;border-radius:100px;background:var(--card);border:1.5px solid var(--border);font-size:12.5px;font-weight:700;cursor:pointer;transition:0.2s;box-shadow:var(--shadow);color:var(--muted)}
+.chip.active{background:#0F172A;color:#fff;border-color:#0F172A;box-shadow:0 8px 20px rgba(15,23,42,0.25);transform:translateY(-1px)}
+.dark.chip.active{background:#fff;color:#000;border-color:#fff}
+.cats{display:flex;gap:14px;overflow-x:auto;padding:6px 16px 18px;scrollbar-width:none}.cats::-webkit-scrollbar{display:none}
+.cat{min-width:72px;text-align:center;cursor:pointer;transition:0.2s}.cat:active{transform:scale(0.93)}
+.cat-icon{width:68px;height:68px;border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:var(--shadow);margin:0 auto;border:1.5px solid var(--border);transition:0.2s;background:var(--card)}
+.cat.active.cat-icon{background:#0F172A;color:#fff;border-color:#0F172A;transform:translateY(-2px);box-shadow:var(--shadow2)}
+.dark.cat.active.cat-icon{background:#fff;color:#000}
+.cat b{font-size:11px;margin-top:8px;display:block;font-weight:700;letter-spacing:-0.1px}
+.section{padding:6px 16px 18px}.sec-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.sec-head h3{font-size:17px;font-weight:800;letter-spacing:-0.4px}.sec-head span{font-size:12.5px;color:var(--teal);font-weight:800;cursor:pointer;background:rgba(10,142,168,0.08);padding:8px 14px;border-radius:100px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.card{background:var(--card);border-radius:26px;overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--border);transition:0.25s;cursor:pointer}
+.card:active{transform:scale(0.97)}
+.card-img{height:132px;display:flex;align-items:center;justify-content:center;font-size:56px;position:relative}
+.badge{position:absolute;top:12px;left:12px;background:#0F172A;color:#fff;font-size:10px;font-weight:800;padding:6px 10px;border-radius:100px;letter-spacing:0.3px;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+.dark.badge{background:#fff;color:#000}
+.heart{position:absolute;top:12px;right:12px;width:34px;height:34px;background:rgba(255,255,255,0.9);backdrop-filter:blur(12px);border-radius:100px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:var(--shadow);border:1px solid rgba(0,0,0,0.05)}
+.dark.heart{background:rgba(21,26,39,0.9)}
+.card-body{padding:12px 14px 14px}.store{font-size:10px;font-weight:800;color:var(--teal);letter-spacing:0.6px;text-transform:uppercase}
+.card-body h4{font-size:13px;font-weight:700;line-height:1.3;margin:4px 0 6px;letter-spacing:-0.2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;height:34px}
+.meta{font-size:11px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:4px}
+.price-row{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.price b{font-size:15px;font-weight:800;letter-spacing:-0.3px}.price small{font-size:11px;color:var(--muted);text-decoration:line-through;margin-left:6px;font-weight:600}
+.add-btn{width:38px;height:38px;background:#0F172A;color:#fff;border:none;border-radius:13px;font-size:20px;font-weight:800;cursor:pointer;box-shadow:0 6px 16px rgba(15,23,42,0.2);transition:0.2s}
+.add-btn:active{transform:scale(0.9)}.dark.add-btn{background:#fff;color:#000}
+.h-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}.h-scroll::-webkit-scrollbar{display:none}
+.h-card{min-width:168px;background:var(--card);border-radius:22px;padding:12px;border:1px solid var(--border);box-shadow:var(--shadow)}
+.bottom{position:fixed;bottom:16px;left:16px;right:16px;background:rgba(255,255,255,0.85);backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--border);border-radius:26px;display:flex;justify-content:space-around;padding:10px 6px 10px;z-index:60;box-shadow:var(--shadow2)}
+.dark.bottom{background:rgba(21,26,39,0.85)}
+.tab{flex:1;text-align:center;cursor:pointer;position:relative;padding:6px 0;border-radius:16px;transition:0.2s}
+.tab.active{background:var(--text);color:var(--card)}.dark.tab.active{background:#fff;color:#000}
+.tab-i{font-size:22px}.tab b{font-size:9.5px;display:block;margin-top:2px;font-weight:700;letter-spacing:0.2px}
+.cart-dot{position:absolute;top:2px;right:18px;background:#EF4444;color:#fff;font-size:10px;font-weight:800;min-width:20px;height:20px;border-radius:100px;display:flex;align-items:center;justify-content:center;border:2px solid var(--card);box-shadow:0 2px 8px rgba(239,68,68,0.4)}
+#ai{position:fixed;bottom:100px;right:18px;width:62px;height:62px;background:linear-gradient(135deg,#0A8EA8,#06B6D4);border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;box-shadow:0 12px 28px rgba(10,142,168,0.4);cursor:pointer;z-index:55;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+#aiChat{display:none;position:fixed;bottom:88px;left:16px;right:16px;max-width:420px;margin:0 auto;height:68vh;background:var(--card);border-radius:28px;box-shadow:var(--shadow2);z-index:70;flex-direction:column;overflow:hidden;border:1px solid var(--border)} #aiChat.open{display:flex;animation:pop 0.3s cubic-bezier(0.34,1.56,0.64,1)}
+@keyframes pop{0%{transform:translateY(20px) scale(0.96);opacity:0}100%{transform:translateY(0) scale(1);opacity:1}}
+.ai-h{background:linear-gradient(135deg,#0A8EA8,#06B6D4);color:#fff;padding:16px 18px;display:flex;justify-content:space-between;align-items:center}
+.ai-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;background:var(--bg)}
+.m{max-width:84%;padding:12px 16px;border-radius:20px;font-size:13px;line-height:1.45;font-weight:600;white-space:pre-line}
+.m.u{align-self:flex-end;background:#0F172A;color:#fff;border-bottom-right-radius:8px;box-shadow:0 4px 12px rgba(15,23,42,0.15)}
+.dark.m.u{background:#fff;color:#000}
+.m.b{align-self:flex-start;background:var(--card);border:1px solid var(--border);border-bottom-left-radius:8px;box-shadow:var(--shadow)}
+.ai-in{display:flex;gap:10px;padding:14px;border-top:1px solid var(--border);background:var(--card)}
+.ai-in input{flex:1;padding:14px 18px;border-radius:100px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);outline:none;font-weight:600;font-size:13px}
+.ai-in input:focus{border-color:var(--teal)}
+.ai-in button{padding:14px 20px;background:#0F172A;color:#fff;border:none;border-radius:100px;font-weight:800;font-size:13px}
+.dark.ai-in button{background:#fff;color:#000}
+.quick{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.quick button{padding:8px 12px;background:var(--bg);color:var(--teal);border:1.5px solid rgba(10,142,168,0.2);border-radius:100px;font-size:11px;font-weight:700;cursor:pointer}
+.modal{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.5);backdrop-filter:blur(16px);justify-content:center;align-items:flex-end;z-index:80}.modal.open{display:flex;animation:fadeIn 0.2s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.sheet{background:var(--card);width:100%;max-width:520px;margin:0 auto;border-radius:32px 32px 0 0;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow2);animation:slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.s-h{padding:20px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);border-radius:32px 32px 0 0;z-index:2}
+.s-h h3{font-weight:800;letter-spacing:-0.3px}
+.s-c{padding:18px}
+.btn{width:100%;padding:16px;border:none;border-radius:18px;font-weight:800;font-size:14px;cursor:pointer;margin-top:12px;letter-spacing:-0.2px;transition:0.2s}
+.btn:active{transform:scale(0.98)}
+.btn-green{background:#0F172A;color:#fff;box-shadow:0 10px 20px rgba(15,23,42,0.2)}.dark.btn-green{background:#fff;color:#000}
+.btn-wa{background:#22C55E;color:#fff}.input{width:100%;padding:14px 16px;border-radius:16px;border:1.5px solid var(--border);font-size:13.5px;margin:7px 0;background:var(--bg);color:var(--text);font-weight:600;outline:none;transition:0.2s}.input:focus{border-color:var(--teal);box-shadow:0 0 0 4px rgba(10,142,168,0.08)}
+.cart-i{display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--border)}.ci{width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:#0F172A;color:#fff;padding:12px 20px;border-radius:100px;font-size:12.5px;font-weight:700;z-index:100;display:none;box-shadow:var(--shadow2);letter-spacing:-0.1px}
+.dark.toast{background:#fff;color:#000}
 </style></head><body>
 <div class="header">
-<div class="h-top"><div class="logo">LONMA ORBIT</div><div class="icons"><div class="ic-btn" onclick="toggleDark()">🌙</div><div class="ic-btn" onclick="document.getElementById('search').focus()">🔍</div><div class="ic-btn">🔔</div></div></div>
-<div class="h-location"><div class="pin">📍</div><div><b>Kajiado Town • 30 min delivery</b><br><small id="userStatus">Guest • Login with WhatsApp</small></div><div style="margin-left:auto" onclick="openProfile()">›</div></div>
-<div class="search"><div class="search-box">🔍<input id="search" placeholder="Search flour, milk, bread..." oninput="searchProd()"></div><div class="filter-btn">☰</div></div>
+<div class="h-top"><div class="logo">LONMA ORBIT</div><div class="icons"><div class="ic" onclick="toggleDark()">🌙</div><div class="ic" onclick="document.getElementById('search').focus()">🔍</div><div class="ic">🔔</div></div></div>
+<div class="h-loc"><div class="loc-icon">📍</div><div><b>Kajiado Town • 30 min delivery</b><br><small id="userStatus">Guest • Login with WhatsApp</small></div><div style="margin-left:auto;font-size:20px;opacity:0.5" onclick="openProfile()">›</div></div>
+<div class="search-wrap"><div class="search-box">🔍<input id="search" placeholder="Search flour, milk, bread, soda..." oninput="searchProd()"></div><div class="filter">☰</div></div>
 </div>
-<div class="hero"><div><h2>Free Delivery<br>on First 3 Orders!</h2><p>Use code LONMA30 • Smart AI Bot</p></div><div class="hero-btn">ORDER NOW</div></div>
+<div class="hero"><div><h2>Free Delivery<br>on First 3 Orders!</h2><p>Use code LONMA30 • Smart AI saves 20%</p></div><div class="hero-btn" onclick="document.getElementById('grid').scrollIntoView({behavior:'smooth'})">ORDER NOW</div></div>
 <div class="chips" id="storeChips"></div>
 <div class="cats" id="catChips"></div>
 <div class="section"><div class="sec-head"><h3>Best Deals Today</h3><span onclick="renderProducts(PRODUCTS)">See All</span></div><div class="grid" id="grid"></div></div>
-<div class="section"><div class="sec-head"><h3>Flash Sale</h3><span style="color:#ff3b30" id="timer">Ends 02:14:33</span></div><div class="h-scroll" id="flash"></div></div>
+<div class="section"><div class="sec-head"><h3>Flash Sale • Live</h3><span style="color:#EF4444;background:#FEF2F2" id="timer">Ends 02:14:33</span></div><div class="h-scroll" id="flash"></div></div>
 <div class="bottom">
 <div class="tab active"><div class="tab-i">🏠</div><b>Home</b></div>
 <div class="tab" onclick="document.getElementById('catChips').scrollIntoView({behavior:'smooth'})"><div class="tab-i">🗂️</div><b>Categories</b></div>
@@ -153,51 +186,54 @@ async def index():
 <div class="tab" onclick="openProfile()"><div class="tab-i">👤</div><b>Profile</b></div>
 </div>
 <div id="ai" onclick="toggleAI()">🤖</div>
-<div id="aiChat"><div class="ai-h"><div><b>LONMA AI</b><div style="font-size:11px;opacity:0.85">Online • 5 stores • Smart Bot</div></div><div onclick="toggleAI()" style="width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</div></div><div class="ai-msgs" id="aiMsgs"><div class="m b">Hello! 👋 I'm your smart LONMA AI!
+<div id="aiChat"><div class="ai-h"><div><b style="font-size:15px">LONMA AI</b><div style="font-size:11px;opacity:0.9;font-weight:600;margin-top:2px">● Online • 5 stores • Instant replies</div></div><div onclick="toggleAI()" style="width:36px;height:36px;background:rgba(255,255,255,0.2);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800">✕</div></div><div class="ai-msgs" id="aiMsgs"><div class="m b">Hello! 👋 I'm LONMA AI
 
-I know prices from 5 supermarkets and can:
-
-- Find cheapest flour, milk, etc
-- Answer "Will you deliver?"
-- Help you order
-
-Try:
-- "Help me"
-- "Will you deliver to Kitengela?"
-- "Cheapest flour"
+Ask me anything:
+• Cheapest flour, milk, bread
+• Will you deliver?
+• Help me order
 </div></div><div class="ai-in"><input id="aiInput" placeholder="Ask anything..." onkeypress="if(event.key==='Enter') sendAI()"><button onclick="sendAI()">Send</button></div></div>
-<div id="cartModal" class="modal"><div class="sheet"><div class="s-h"><h3>Cart (<span id="cartC">0</span>)</h3><div onclick="closeM()" style="width:36px;height:36px;background:var(--bg);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</div></div><div class="s-c"><div id="cartItems"></div><div style="background:var(--bg);border-radius:16px;padding:14px;margin:14px 0"><div style="display:flex;justify-content:space-between;font-size:12px;margin:5px 0"><span>Subtotal</span><b>KES <span id="sub">0</span></b></div><div style="display:flex;justify-content:space-between;font-size:12px;margin:5px 0"><span>Delivery</span><b>KES 100</b></div><div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;border-top:1px solid var(--border);margin-top:8px;padding-top:10px"><span>Total</span><b>KES <span id="grand">0</span></b></div></div><input id="custName" class="input" placeholder="Full Name"><input id="custPhone" class="input" value="254" placeholder="M-Pesa Phone"><input id="custLoc" class="input" placeholder="Delivery Location"><button class="btn btn-green" onclick="checkout()">Place Order - Rider 30min</button><div id="status" style="text-align:center;font-size:11px;font-weight:700;margin-top:8px"></div><div id="track" style="display:none;margin-top:12px;background:#e8f5e9;border-radius:16px;padding:14px;color:#000"><b>Order <span id="orderId"></span> Confirmed!</b><p style="font-size:11px;margin-top:6px" id="riderInfo">Rider assigned</p></div></div></div></div>
-<div id="riderModal" class="modal"><div class="sheet"><div class="s-h"><h3>Rider Center</h3><div onclick="closeM()" style="width:36px;height:36px;background:var(--bg);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</div></div><div class="s-c"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:#e0f7fa;padding:14px;border-radius:16px;text-align:center"><b>3</b><br><small style="font-size:10px">Online</small></div><div style="background:#fff3cd;padding:14px;border-radius:16px;text-align:center"><b id="rs2">0</b><br><small style="font-size:10px">Orders</small></div><div style="background:#d4edda;padding:14px;border-radius:16px;text-align:center"><b id="rs3">KES 0</b><br><small style="font-size:10px">Sales</small></div></div><div id="riderList" style="margin-top:14px"></div><div id="riderOrders" style="margin-top:10px"></div></div></div></div>
-<div id="profileModal" class="modal"><div class="sheet"><div class="s-h"><h3>Profile</h3><div onclick="closeM()" style="width:36px;height:36px;background:var(--bg);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</div></div><div class="s-c"><div style="text-align:center;padding:10px 0 20px"><div style="width:80px;height:80px;background:#0A8EA8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;color:#fff;margin:0 auto">👤</div><h3 style="margin-top:12px" id="profileName">Welcome</h3><small style="color:var(--muted)" id="profilePhone">Login to order faster</small></div><div id="notLogged"><input id="waPhone" class="input" value="254" placeholder="WhatsApp 254712..."><button class="btn btn-wa" onclick="loginWA()">Login with WhatsApp</button></div><div id="logged" style="display:none"><div style="background:#d4edda;border-radius:14px;padding:12px;text-align:center;color:#000"><b>Logged in</b><br><small id="loggedPhone">254...</small></div><button class="btn" style="background:#111;color:#fff" onclick="logout()">Logout</button></div><div style="margin-top:16px;display:grid;gap:10px"><div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;justify-content:space-between"><span>Dark Mode</span><span onclick="toggleDark()" style="padding:6px 12px;background:var(--bg);border-radius:10px;font-size:11px;font-weight:800;cursor:pointer">Toggle</span></div><div onclick="openAdmin()" style="background:#111;color:#fff;border-radius:16px;padding:14px;display:flex;justify-content:space-between"><span>Admin Dashboard</span><span>›</span></div></div></div></div></div>
-<div id="adminModal" class="modal"><div class="sheet"><div class="s-h"><h3>Admin</h3><div onclick="closeM()" style="width:36px;height:36px;background:var(--bg);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</div></div><div class="s-c"><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px" id="adminStats"></div><div id="adminOrders" style="margin-top:12px"></div></div></div></div>
+<div id="cartModal" class="modal"><div class="sheet"><div class="s-h"><h3>Cart (<span id="cartC">0</span>)</h3><div onclick="closeM()" style="width:40px;height:40px;background:var(--bg);border-radius:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800">✕</div></div><div class="s-c"><div id="cartItems"></div><div style="background:var(--bg);border-radius:20px;padding:16px;margin:16px 0;border:1px solid var(--border)"><div style="display:flex;justify-content:space-between;font-size:13px;margin:6px 0"><span style="color:var(--muted);font-weight:600">Subtotal</span><b>KES <span id="sub">0</span></b></div><div style="display:flex;justify-content:space-between;font-size:13px;margin:6px 0"><span style="color:var(--muted);font-weight:600">Delivery</span><b>KES 100</b></div><div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;border-top:1px solid var(--border);margin-top:10px;padding-top:12px"><span>Total</span><b>KES <span id="grand">0</span></b></div></div><input id="custName" class="input" placeholder="Full Name"><input id="custPhone" class="input" value="254" placeholder="M-Pesa Phone 2547..."><input id="custLoc" class="input" placeholder="Delivery Location (Kajiado, Kitengela)"><button class="btn btn-green" onclick="checkout()">Place Order • Rider in 30 min</button><div id="status" style="text-align:center;font-size:11px;font-weight:700;margin-top:10px"></div><div id="track" style="display:none;margin-top:14px;background:linear-gradient(135deg,#DCFCE7,#BBF7D0);border-radius:20px;padding:16px;color:#14532D;border:1px solid #86EFAC"><b>Order <span id="orderId"></span> Confirmed! 🎉</b><p style="font-size:11.5px;margin-top:6px;font-weight:600" id="riderInfo">Rider assigned</p></div></div></div></div>
+<div id="riderModal" class="modal"><div class="sheet"><div class="s-h"><h3>Rider Center 🏍️</h3><div onclick="closeM()" style="width:40px;height:40px;background:var(--bg);border-radius:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800">✕</div></div><div class="s-c"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"><div style="background:linear-gradient(135deg,#E0F7FA,#B2EBF2);padding:16px;border-radius:20px;text-align:center;color:#0E7490"><b style="font-size:20px">3</b><br><small style="font-size:10px;font-weight:700">ONLINE</small></div><div style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);padding:16px;border-radius:20px;text-align:center;color:#92400E"><b id="rs2" style="font-size:20px">0</b><br><small style="font-size:10px;font-weight:700">ORDERS</small></div><div style="background:linear-gradient(135deg,#DCFCE7,#BBF7D0);padding:16px;border-radius:20px;text-align:center;color:#14532D"><b id="rs3" style="font-size:18px">KES 0</b><br><small style="font-size:10px;font-weight:700">SALES</small></div></div><div id="riderList" style="margin-top:16px"></div><div id="riderOrders" style="margin-top:12px"></div></div></div></div>
+<div id="profileModal" class="modal"><div class="sheet"><div class="s-h"><h3>Profile</h3><div onclick="closeM()" style="width:40px;height:40px;background:var(--bg);border-radius:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800">✕</div></div><div class="s-c"><div style="text-align:center;padding:8px 0 22px"><div style="width:88px;height:88px;background:linear-gradient(135deg,#0A8EA8,#06B6D4);border-radius:28px;display:flex;align-items:center;justify-content:center;font-size:40px;color:#fff;margin:0 auto;box-shadow:0 12px 28px rgba(10,142,168,0.3)">👤</div><h3 style="margin-top:14px;font-size:18px;font-weight:800;letter-spacing:-0.3px" id="profileName">Welcome to LONMA</h3><small style="color:var(--muted);font-weight:600" id="profilePhone">Login to order faster & save 20%</small></div><div id="notLogged"><input id="waPhone" class="input" value="254" placeholder="WhatsApp 254712..."><button class="btn btn-wa" onclick="loginWA()">Login with WhatsApp • Instant</button></div><div id="logged" style="display:none"><div style="background:linear-gradient(135deg,#DCFCE7,#BBF7D0);border-radius:18px;padding:14px;text-align:center;color:#14532D;border:1px solid #86EFAC"><b>Logged in ✓</b><br><small id="loggedPhone" style="font-weight:700">254...</small></div><button class="btn" style="background:#0F172A;color:#fff" onclick="logout()">Logout</button></div><div style="margin-top:18px;display:grid;gap:12px"><div style="background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:16px;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--shadow)"><span style="font-weight:700;font-size:13px">🌙 Dark Mode</span><span onclick="toggleDark()" style="padding:8px 14px;background:var(--bg);border-radius:100px;font-size:11px;font-weight:800;cursor:pointer;border:1px solid var(--border)">Toggle</span></div><div onclick="openAdmin()" style="background:#0F172A;color:#fff;border-radius:20px;padding:16px;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--shadow)"><span style="font-weight:700;font-size:13px">📊 Admin Dashboard</span><span>›</span></div></div></div></div></div>
+<div id="adminModal" class="modal"><div class="sheet"><div class="s-h"><h3>Admin</h3><div onclick="closeM()" style="width:40px;height:40px;background:var(--bg);border-radius:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:800">✕</div></div><div class="s-c"><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px" id="adminStats"></div><div id="adminOrders" style="margin-top:14px"></div></div></div></div>
 <div class="toast" id="toast"></div>
 <script>
 var PRODUCTS = [
-{id:1,name:"Ajab Maize Flour 2kg",price:175,old:195,store:"Naivas",cat:"grocery",rate:4.8,sold:234,emoji:"🌽"},
-{id:2,name:"Brookside Milk 500ml",price:65,old:75,store:"Naivas",cat:"dairy",rate:4.9,sold:512,emoji:"🥛"},
-{id:3,name:"Coca Cola 1.25L",price:100,old:120,store:"Quickmart",cat:"drinks",rate:4.7,sold:320,emoji:"🥤"},
-{id:4,name:"Omo Detergent 1kg",price:285,old:320,store:"Carrefour",cat:"home",rate:4.6,sold:89,emoji:"🧴"},
-{id:5,name:"Tomatoes Fresh 1kg",price:80,old:100,store:"Quickmart",cat:"fresh",rate:4.9,sold:445,emoji:"🍅"},
-{id:6,name:"White Bread 400g",price:60,old:70,store:"Naivas",cat:"dairy",rate:4.8,sold:210,emoji:"🍞"},
-{id:7,name:"Pishori Rice 2kg",price:350,old:400,store:"Carrefour",cat:"grocery",rate:4.9,sold:156,emoji:"🍚"},
-{id:8,name:"Geisha Soap 150g",price:55,old:65,store:"Magunas",cat:"care",rate:4.5,sold:98,emoji:"🧼"}
+{id:1,name:"Ajab Maize Flour 2kg",price:175,old:195,store:"Naivas",cat:"grocery",rate:4.8,sold:234,emoji:"🌽",color:"#FFF8E1"},
+{id:2,name:"Brookside Milk 500ml",price:65,old:75,store:"Naivas",cat:"dairy",rate:4.9,sold:512,emoji:"🥛",color:"#E3F2FD"},
+{id:3,name:"Coca Cola 1.25L",price:100,old:120,store:"Quickmart",cat:"drinks",rate:4.7,sold:320,emoji:"🥤",color:"#FFEBEE"},
+{id:4,name:"Omo Detergent 1kg",price:285,old:320,store:"Carrefour",cat:"home",rate:4.6,sold:89,emoji:"🧴",color:"#E8F5E9"},
+{id:5,name:"Tomatoes Fresh 1kg",price:80,old:100,store:"Quickmart",cat:"fresh",rate:4.9,sold:445,emoji:"🍅",color:"#FFF3E0"},
+{id:6,name:"White Bread 400g",price:60,old:70,store:"Naivas",cat:"dairy",rate:4.8,sold:210,emoji:"🍞",color:"#FFF8E1"},
+{id:7,name:"Pishori Rice 2kg",price:350,old:400,store:"Carrefour",cat:"grocery",rate:4.9,sold:156,emoji:"🍚",color:"#F3E5F5"},
+{id:8,name:"Geisha Soap 150g",price:55,old:65,store:"Magunas",cat:"care",rate:4.5,sold:98,emoji:"🧼",color:"#E0F7FA"}
 ];
 var STORES = ["ALL","Naivas","Quickmart","Carrefour","Chandarana","Magunas"];
-var CATS = [{id:"all",name:"All",icon:"🏪"},{id:"fresh",name:"Fresh",icon:"🥬"},{id:"grocery",name:"Grocery",icon:"🌽"},{id:"drinks",name:"Drinks",icon:"🥤"},{id:"dairy",name:"Dairy",icon:"🥛"},{id:"home",name:"Home",icon:"🧹"},{id:"care",name:"Care",icon:"🧴"},{id:"baby",name:"Baby",icon:"👶"}];
+var CATS = [
+{id:"all",name:"All",icon:"🏪",color:"#F1F5F9"},
+{id:"fresh",name:"Fresh",icon:"🥬",color:"#DCFCE7"},
+{id:"grocery",name:"Grocery",icon:"🌽",color:"#FEF3C7"},
+{id:"drinks",name:"Drinks",icon:"🥤",color:"#FCE7F3"},
+{id:"dairy",name:"Dairy",icon:"🥛",color:"#DBEAFE"},
+{id:"home",name:"Home",icon:"🧹",color:"#E0E7FF"},
+{id:"care",name:"Care",icon:"🧴",color:"#CCFBF1"},
+{id:"baby",name:"Baby",icon:"👶",color:"#FFEDD5"}
+];
 var cart = []; var total = 0; var activeStore = "ALL"; var activeCat = "all"; var isDark = false;
 
 function renderChips(){
  var sHtml = ""; for(var i=0;i<STORES.length;i++){ var s=STORES[i]; sHtml += '<div class="'+(s===activeStore?'chip active':'chip')+'" onclick="setStore(\\''+s+'\\')">'+s+'</div>'; }
  document.getElementById("storeChips").innerHTML = sHtml;
- var cHtml = ""; for(var j=0;j<CATS.length;j++){ var c=CATS[j]; cHtml += '<div class="'+(c.id===activeCat?'cat active':'cat')+'" onclick="setCat(\\''+c.id+'\\')"><div class="cat-icon">'+c.icon+'</div><b>'+c.name+'</b></div>'; }
+ var cHtml = ""; for(var j=0;j<CATS.length;j++){ var c=CATS[j]; var bg=c.color; cHtml += '<div class="'+(c.id===activeCat?'cat active':'cat')+'" onclick="setCat(\\''+c.id+'\\')"><div class="cat-icon" style="background:'+bg+'">'+c.icon+'</div><b>'+c.name+'</b></div>'; }
  document.getElementById("catChips").innerHTML = cHtml;
 }
 function renderProducts(list){
- var html = ""; for(var i=0;i<list.length;i++){ var p=list[i]; var disc=Math.round((p.old-p.price)/p.old*100); html += '<div class="card"><div class="card-img">'+p.emoji+'<div class="badge">-'+disc+'%</div><div class="heart">♡</div></div><div class="card-body"><div class="store">'+p.store+'</div><h4>'+p.name+'</h4><div class="meta">⭐ '+p.rate+' • '+p.sold+' sold</div><div class="price-row"><div class="price"><b>KES '+p.price+'</b><small>KES '+p.old+'</small></div><button class="add-btn" onclick="addToCart('+p.id+')">+</button></div></div></div>'; }
+ var html = ""; for(var i=0;i<list.length;i++){ var p=list[i]; var disc=Math.round((p.old-p.price)/p.old*100); html += '<div class="card"><div class="card-img" style="background:'+p.color+'">'+p.emoji+'<div class="badge">-'+disc+'%</div><div class="heart">♡</div></div><div class="card-body"><div class="store">'+p.store+'</div><h4>'+p.name+'</h4><div class="meta">⭐ '+p.rate+' • '+p.sold+' sold</div><div class="price-row"><div class="price"><b>KES '+p.price+'</b><small>'+p.old+'</small></div><button class="add-btn" onclick="addToCart('+p.id+')">+</button></div></div></div>'; }
  document.getElementById("grid").innerHTML = html;
 }
 function renderFlash(){
- var html = ""; for(var i=0;i<4;i++){ var p=PRODUCTS[i]; html += '<div class="h-card"><div style="font-size:32px;text-align:center;padding:10px">'+p.emoji+'</div><div style="font-size:11px;font-weight:700">'+p.name+'</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><b>KES '+p.price+'</b><button class="add-btn" style="width:26px;height:26px" onclick="addToCart('+p.id+')">+</button></div></div>'; }
+ var html = ""; for(var i=0;i<4;i++){ var p=PRODUCTS[i]; html += '<div class="h-card"><div style="font-size:36px;text-align:center;padding:12px;background:'+p.color+';border-radius:16px;margin-bottom:8px">'+p.emoji+'</div><div style="font-size:11.5px;font-weight:700;letter-spacing:-0.2px">'+p.name+'</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><b style="font-size:13px">KES '+p.price+'</b><button class="add-btn" style="width:30px;height:30px;font-size:16px" onclick="addToCart('+p.id+')">+</button></div></div>'; }
  document.getElementById("flash").innerHTML = html;
 }
 function setStore(s){ activeStore=s; renderChips(); filterProducts(); }
@@ -215,12 +251,12 @@ function addToCart(id){
  if(!p) return; cart.push(p); total+=p.price;
  document.getElementById("cartDot").innerText=cart.length;
  document.getElementById("cartC").innerText=cart.length;
- showToast(p.name+" added");
+ showToast(p.name+" added ✓");
 }
 function openCart(){
  var d=document.getElementById("cartItems");
- if(cart.length===0){ d.innerHTML='<p style="text-align:center;padding:20px;color:var(--muted)">Cart empty</p>'; }
- else { var html=""; for(var i=0;i<cart.length;i++){ var c=cart[i]; html+='<div class="cart-i"><div class="ci">'+c.emoji+'</div><div style="flex:1"><h4 style="font-size:12px">'+c.name+'</h4><small>'+c.store+' • KES '+c.price+'</small></div><b>KES '+c.price+'</b></div>'; } d.innerHTML=html; }
+ if(cart.length===0){ d.innerHTML='<p style="text-align:center;padding:28px;color:var(--muted);font-weight:600">Cart empty - add items to order</p>'; }
+ else { var html=""; for(var i=0;i<cart.length;i++){ var c=cart[i]; html+='<div class="cart-i"><div class="ci" style="background:'+c.color+'">'+c.emoji+'</div><div style="flex:1"><h4 style="font-size:13px;font-weight:700">'+c.name+'</h4><small style="color:var(--muted);font-weight:600">'+c.store+' • KES '+c.price+'</small></div><b style="font-size:14px">KES '+c.price+'</b></div>'; } d.innerHTML=html; }
  document.getElementById("sub").innerText=total; document.getElementById("grand").innerText=total+100;
  document.getElementById("cartModal").classList.add("open");
 }
@@ -229,10 +265,10 @@ function openProfile(){ document.getElementById("profileModal").classList.add("o
 function openAdmin(){ closeM(); document.getElementById("adminModal").classList.add("open"); loadAdmin(); }
 function closeM(){ var modals=document.querySelectorAll(".modal"); for(var i=0;i<modals.length;i++) modals[i].classList.remove("open"); }
 function toggleAI(){ document.getElementById("aiChat").classList.toggle("open"); }
-function toggleDark(){ isDark=!isDark; document.body.classList.toggle("dark",isDark); localStorage.setItem("dark",isDark); showToast(isDark?"Dark mode on 🌙":"Light mode on ☀️"); }
+function toggleDark(){ isDark=!isDark; document.body.classList.toggle("dark",isDark); localStorage.setItem("dark",isDark); showToast(isDark?"Dark mode 🌙":"Light mode ☀️"); }
 function loginWA(){
  var phone=document.getElementById("waPhone").value;
- if(phone.length<10){ alert("Enter valid number"); return; }
+ if(phone.length<10){ alert("Enter valid number 2547..."); return; }
  localStorage.setItem("user",phone);
  document.getElementById("notLogged").style.display="none"; document.getElementById("logged").style.display="block";
  document.getElementById("loggedPhone").innerText=phone; document.getElementById("profileName").innerText="Welcome! "+phone.slice(-4);
@@ -240,7 +276,7 @@ function loginWA(){
  document.getElementById("custPhone").value=phone;
  showToast("Logged in ✅"); fetch("/user/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone:phone})});
 }
-function logout(){ localStorage.removeItem("user"); document.getElementById("notLogged").style.display="block"; document.getElementById("logged").style.display="none"; document.getElementById("profileName").innerText="Welcome"; document.getElementById("profilePhone").innerText="Login to order faster"; showToast("Logged out"); }
+function logout(){ localStorage.removeItem("user"); document.getElementById("notLogged").style.display="block"; document.getElementById("logged").style.display="none"; document.getElementById("profileName").innerText="Welcome to LONMA"; document.getElementById("profilePhone").innerText="Login to order faster & save 20%"; showToast("Logged out"); }
 async function sendAI(){
  var input=document.getElementById("aiInput"); var msg=input.value.trim(); if(!msg) return;
  var box=document.getElementById("aiMsgs");
@@ -256,7 +292,7 @@ async function sendAI(){
    }
    box.innerHTML+='<div class="m b">'+d.reply+quickHtml+'</div>';
  } catch(e){
-   box.innerHTML+='<div class="m b">Sorry, error. Try again. Error: '+e+'</div>';
+   box.innerHTML+='<div class="m b">Sorry, error. Try again.</div>';
  }
  box.scrollTop=box.scrollHeight;
 }
@@ -266,25 +302,25 @@ async function checkout(){
  if(!loc){ alert("Enter location"); return; }
  document.getElementById("status").innerText="Placing order...";
  var r=await fetch("/mpesa/stkpush",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone:phone,amount:total+100,location:loc,cart:cart})});
- var d=await r.json(); document.getElementById("orderId").innerText=d.order_id; document.getElementById("status").innerText="Order placed!"; document.getElementById("track").style.display="block"; document.getElementById("riderInfo").innerText="Rider John KMEZ 123A • 4.9 stars • 30min"; cart=[]; total=0; document.getElementById("cartDot").innerText=0;
+ var d=await r.json(); document.getElementById("orderId").innerText=d.order_id; document.getElementById("status").innerText="Order placed!"; document.getElementById("track").style.display="block"; document.getElementById("riderInfo").innerText="Rider John KMEZ 123A • 4.9★ • 30min away • Will call you"; cart=[]; total=0; document.getElementById("cartDot").innerText=0;
 }
 async function loadRiders(){
  var r=await fetch("/riders"); var riders=await r.json();
- var html=""; for(var i=0;i<riders.length;i++){ var rd=riders[i]; html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div><b>'+rd.name+' ⭐'+rd.rating+'</b><br><small style="color:var(--muted)">'+rd.motor+' • '+rd.location+'</small></div><div style="padding:6px 10px;border-radius:10px;background:'+(rd.status==="available"?"#d4edda":"#fff3cd")+';color:#000;font-size:10px;font-weight:800">'+rd.status+'</div></div>'; }
+ var html=""; for(var i=0;i<riders.length;i++){ var rd=riders[i]; html+='<div style="background:var(--card);border:1.5px solid var(--border);border-radius:20px;padding:14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;box-shadow:var(--shadow)"><div><b style="font-size:13px">'+rd.name+' ⭐'+rd.rating+'</b><br><small style="color:var(--muted);font-weight:600">'+rd.motor+' • '+rd.location+'</small></div><div style="padding:7px 12px;border-radius:100px;background:'+(rd.status==="available"?"#DCFCE7":"#FEF3C7")+';color:'+(rd.status==="available"?"#14532D":"#92400E")+';font-size:10px;font-weight:800">'+rd.status.toUpperCase()+'</div></div>'; }
  document.getElementById("riderList").innerHTML=html;
  var ro=await fetch("/orders"); var orders=await ro.json();
  document.getElementById("rs2").innerText=orders.length; document.getElementById("rs3").innerText="KES "+orders.reduce(function(s,o){return s+o.amount},0);
- var oh='<h4 style="margin:12px 0 8px;font-size:12px">Active Orders</h4>'; for(var j=0;j<Math.min(orders.length,5);j++){ var o=orders[j]; oh+='<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><div><b>'+o.id+'</b> KES '+o.amount+'<br><small>'+o.location+'</small></div><button onclick="acceptOrder(\\''+o.id+'\\')" style="padding:8px 12px;background:#00a651;color:#fff;border:none;border-radius:10px;font-size:11px;font-weight:800">Accept</button></div>'; }
+ var oh='<h4 style="margin:14px 0 10px;font-size:13px;font-weight:800">Active Orders</h4>'; for(var j=0;j<Math.min(orders.length,5);j++){ var o=orders[j]; oh+='<div style="background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div><b style="font-size:12px">'+o.id+'</b> KES '+o.amount+'<br><small style="color:var(--muted);font-weight:600">'+o.location+'</small></div><button onclick="acceptOrder(\\''+o.id+'\\')" style="padding:9px 14px;background:#0F172A;color:#fff;border:none;border-radius:100px;font-size:11px;font-weight:800">Accept</button></div>'; }
  document.getElementById("riderOrders").innerHTML=oh;
 }
 async function loadAdmin(){
  var r=await fetch("/orders"); var o=await r.json();
- document.getElementById("adminStats").innerHTML='<div style="background:var(--card);border:1px solid var(--border);padding:16px;border-radius:16px;text-align:center"><b style="font-size:22px">'+o.length+'</b><br><small>Orders</small></div><div style="background:var(--card);border:1px solid var(--border);padding:16px;border-radius:16px;text-align:center"><b style="font-size:22px">KES '+o.reduce(function(s,x){return s+x.amount},0)+'</b><br><small>Revenue</small></div>';
- var html=""; for(var i=0;i<Math.min(o.length,8);i++){ var x=o[i]; html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px;margin-bottom:6px"><b>'+x.id+'</b> - '+x.status+'<br><small>'+x.location+' • KES '+x.amount+'</small></div>'; }
+ document.getElementById("adminStats").innerHTML='<div style="background:var(--card);border:1.5px solid var(--border);padding:18px;border-radius:20px;text-align:center;box-shadow:var(--shadow)"><b style="font-size:24px">'+o.length+'</b><br><small style="color:var(--muted);font-weight:700;font-size:10px">ORDERS</small></div><div style="background:var(--card);border:1.5px solid var(--border);padding:18px;border-radius:20px;text-align:center;box-shadow:var(--shadow)"><b style="font-size:20px">KES '+o.reduce(function(s,x){return s+x.amount},0)+'</b><br><small style="color:var(--muted);font-weight:700;font-size:10px">REVENUE</small></div>';
+ var html=""; for(var i=0;i<Math.min(o.length,8);i++){ var x=o[i]; html+='<div style="background:var(--card);border:1.5px solid var(--border);border-radius:18px;padding:12px;margin-bottom:8px"><b style="font-size:12px">'+x.id+'</b> - '+x.status+'<br><small style="color:var(--muted);font-weight:600">'+x.location+' • KES '+x.amount+'</small></div>'; }
  document.getElementById("adminOrders").innerHTML=html;
 }
-async function acceptOrder(id){ await fetch("/rider/accept/"+id,{method:"POST"}); showToast("Accepted "+id); loadRiders(); }
-function showToast(t){ var el=document.getElementById("toast"); el.innerText=t; el.style.display="block"; setTimeout(function(){el.style.display="none"},2500); }
+async function acceptOrder(id){ await fetch("/rider/accept/"+id,{method:"POST"}); showToast("Accepted "+id+" ✓"); loadRiders(); }
+function showToast(t){ var el=document.getElementById("toast"); el.innerText=t; el.style.display="block"; setTimeout(function(){el.style.display="none"},2600); }
 
 if(localStorage.getItem("dark")==="true"){ isDark=true; document.body.classList.add("dark"); }
 renderChips(); renderProducts(PRODUCTS); renderFlash();
@@ -312,8 +348,8 @@ async def chat(req: Request):
         else:
             quick=["Help me","Will you deliver?","Cheapest flour"]
         return {"reply": reply, "quick": quick}
-    except Exception as e:
-        return {"reply": f"I understood: {b.get('message','')} - I can help with delivery, prices, and ordering. Try 'Help me' or 'Will you deliver?'", "quick": ["Help me","Will you deliver?"]}
+    except:
+        return {"reply": "I can help with delivery, prices, ordering. Try 'Help me'", "quick": ["Help me","Will you deliver?"]}
 
 @app.post("/user/login")
 async def login_user(req: Request):
