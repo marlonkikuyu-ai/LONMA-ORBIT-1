@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os, base64, requests, random, re
+import os, base64, requests, random
 from datetime import datetime
 
 app = FastAPI()
@@ -16,10 +16,12 @@ MPESA_ENV=os.getenv("MPESA_ENV","sandbox")
 
 def get_token():
     try:
-        if not MPESA_CONSUMER_KEY: return None
+        if not MPESA_CONSUMER_KEY:
+            return None
         url="https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials" if MPESA_ENV=="sandbox" else "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
         return requests.get(url, auth=(MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET), timeout=8).json().get("access_token")
-    except: return None
+    except:
+        return None
 
 PRODUCTS=[
  {"id":1,"name":"Ajab Maize Flour 2kg","price":175,"old":195,"store":"Naivas","cat":"grocery","stock":50,"rate":4.8,"sold":234,"emoji":"🌽"},
@@ -31,94 +33,69 @@ PRODUCTS=[
  {"id":7,"name":"Pishori Rice 2kg","price":350,"old":400,"store":"Carrefour","cat":"grocery","stock":30,"rate":4.9,"sold":156,"emoji":"🍚"},
  {"id":8,"name":"Geisha Soap 150g","price":55,"old":65,"store":"Magunas","cat":"care","stock":90,"rate":4.5,"sold":98,"emoji":"🧼"},
 ]
-RIDERS=[{"id":1,"name":"John Mwangi","motor":"KMEZ 123A","status":"available","rating":4.9,"location":"Kajiado","trips":12},{"id":2,"name":"Peter Ochieng","motor":"KMFA 456B","status":"delivering","rating":4.8,"location":"Kitengela","trips":28},{"id":3,"name":"Samuel Kiprop","motor":"KMEB 789C","status":"available","rating":5.0,"location":"Rongai","trips":15}]
+RIDERS=[
+ {"id":1,"name":"John Mwangi","motor":"KMEZ 123A","status":"available","rating":4.9,"location":"Kajiado","trips":12},
+ {"id":2,"name":"Peter Ochieng","motor":"KMFA 456B","status":"delivering","rating":4.8,"location":"Kitengela","trips":28},
+ {"id":3,"name":"Samuel Kiprop","motor":"KMEB 789C","status":"available","rating":5.0,"location":"Rongai","trips":15}
+]
 ORDERS=[]
 
-# ===== SMART AI BOT LOGIC =====
 def smart_ai_reply(message, cart_count=0):
-    msg = message.lower().strip()
-
-    # Greetings
+    msg=message.lower().strip()
     if any(w in msg for w in ["hello","hi","hey","jambo","habari"]):
         return "Hello! 👋 I'm LONMA AI, your smart shopping assistant!\n\nI know prices from 5 stores: Naivas, Quickmart, Carrefour, Chandarana & Magunas.\n\nI can:\n• Find cheapest products\n• Check stock\n• Track rider delivery\n• Help you order\n\nWhat do you need today? Try 'cheapest flour' or 'help me'"
-
-    # Help
     if any(w in msg for w in ["help","assist","what can you","how to","guide"]):
         return "I can help you with:\n\n🛒 PRODUCTS: Say 'flour', 'milk', 'bread', 'soda' - I'll find cheapest price\n\n💰 PRICES: 'cheapest flour' or 'compare milk'\n\n🏍️ DELIVERY: 'will you deliver?', 'rider time', 'delivery fee'\n\n📦 ORDER: 'how to order', 'my cart', 'checkout'\n\n💳 PAYMENT: 'M-Pesa', 'cash on delivery'\n\nJust type what you need! For example: 'Will you deliver to Kitengela?'"
-
-    # Delivery questions - FIXES YOUR SCREENSHOT ISSUE
     if any(w in msg for w in ["deliver","delivery","bring","come","transport"]):
         if "where" in msg or "location" in msg or "area" in msg:
             return "Yes! We deliver to:\n\n📍 Kajiado Town\n📍 Kitengela\n📍 Rongai\n📍 Kiserian\n📍 Ongata Rongai\n\nDelivery in 30 minutes! Fee is KES 100.\n\nWe have 3 riders online now:\n• John Mwangi - KMEZ 123A - 4.9★ - Available\n• Peter Ochieng - 4.8★ - Delivering\n• Samuel Kiprop - 5.0★ - Available\n\nWhere should I deliver to?"
         if "kitengela" in msg or "rongai" in msg or "kajiado" in msg:
             return f"Yes! We deliver to {msg.title()}! 🏍️\n\nDelivery time: 30 minutes\nDelivery fee: KES 100\nRider will call you when near.\n\nAdd products to cart and checkout - rider will be assigned immediately!\n\nWhat do you want to order?"
         return "Yes, we deliver! 🚚💨\n\n✅ We deliver in 30 minutes\n✅ Areas: Kajiado, Kitengela, Rongai\n✅ Fee: KES 100 only\n✅ 3 riders available now\n✅ Pay M-Pesa or Cash\n\nJust add items to cart and checkout. Where do you want delivery?"
-
     if "yes" in msg and ("bring" in msg or "deliver" in msg or "on" in msg):
         return "Great! Let's order! 🛒\n\n1. Add products from Best Deals (tap + button)\n2. Click Cart icon (bottom)\n3. Enter your location and M-Pesa number\n4. Click 'Place Order'\n\nRider will be assigned in 30 seconds and deliver in 30 minutes!\n\nWhat do you want? Flour? Milk? Bread?"
-
     if "will you" in msg or "can you" in msg:
         if "deliver" in msg:
             return "Yes, we will deliver! 🏍️ 30 minutes, KES 100 fee. We cover Kajiado, Kitengela, Rongai. Add to cart and checkout - rider comes immediately!"
         return "Yes, I can help! Tell me what you need - flour, milk, delivery info, or how to order?"
-
-    # Price comparisons
     if "cheapest" in msg or "cheap" in msg or "lowest" in msg:
         for p in PRODUCTS:
             if any(word in msg for word in p["name"].lower().split()[:2]):
-                cheapest = min([x for x in PRODUCTS if p["cat"]==x["cat"]], key=lambda x: x["price"]) if len([x for x in PRODUCTS if p["cat"]==x["cat"]])>1 else p
+                cheapest=min([x for x in PRODUCTS if p["cat"]==x["cat"]], key=lambda x: x["price"]) if len([x for x in PRODUCTS if p["cat"]==x["cat"]])>1 else p
                 return f"Cheapest {p['name'].split()[0]} is {cheapest['name']} at KES {cheapest['price']} at {cheapest['store']} (was KES {cheapest['old']}) - {cheapest['stock']} in stock! ⭐{cheapest['rate']}\n\nTap + to add to cart!"
-        # Generic cheapest
         return "Here are cheapest items today:\n\n🌽 Flour 2kg - KES 175 Naivas (was 195)\n🥛 Milk 500ml - KES 65 Naivas (was 75)\n🍅 Tomatoes 1kg - KES 80 Quickmart (was 100)\n🍞 Bread - KES 60 Naivas\n\nAll have 10-20% OFF! Which do you want?"
-
-    # Specific products
     if "flour" in msg or "maize" in msg or "unga" in msg:
         return "Ajab Maize Flour 2kg:\n\n💰 KES 175 at Naivas (cheapest!)\n💰 KES 178 at Quickmart\n💰 KES 172 at Carrefour (best deal!)\n\n📦 50 packs in stock\n⭐ 4.8 stars, 234 sold\n\nGood for ugali! Tap + on flour card to add to cart. Want me to add it?"
-
     if "milk" in msg or "maziwa" in msg:
         return "Brookside Milk 500ml:\n\n💰 KES 65 Naivas\n💰 KES 62 Chandarana (cheapest!)\n📦 100 packs fresh today\n⭐ 4.9 stars, 512 sold\n\nFresh daily milk! Goes well with bread KES 60. Add to cart?"
-
     if "bread" in msg or "mkate" in msg:
         return "White Bread 400g:\n\n💰 KES 60 Naivas (fresh)\n📦 70 loaves available\n⭐ 4.8 stars\n\nSoft fresh bread! Best with milk and eggs. Tap + to add!"
-
     if "tomato" in msg or "nyanya" in msg:
         return "Tomatoes Fresh 1kg:\n\n💰 KES 80 Quickmart (was KES 100)\n📦 60kg farm fresh today\n⭐ 4.9 stars, 445 sold\n\nFarm fresh! Great for stew. Add to cart?"
-
     if "soda" in msg or "coke" in msg or "drink" in msg:
         return "Coca Cola 1.25L:\n\n💰 KES 100 Quickmart\n💰 KES 99 Magunas (cheapest)\n📦 80 bottles chilled\n⭐ 4.7 stars\n\nChilled! Add to cart?"
-
     if "omo" in msg or "detergent" in msg or "soap" in msg:
         return "Omo Detergent 1kg KES 285 at Carrefour (cheapest, was 320) - 40 packs. Geisha Soap 150g KES 55 Magunas. Need household items?"
-
     if "rider" in msg or "delivery time" in msg or "how long" in msg:
         return "Rider info 🏍️:\n\n⏱️ Delivery: 30 minutes\n💰 Fee: KES 100\n📍 Areas: Kajiado, Kitengela, Rongai\n👥 Riders: 3 online\n\n• John KMEZ 123A - 4.9★ - Available - Kajiado\n• Peter KMFA 456B - 4.8★ - Delivering - Kitengela\n• Samuel KMEB 789C - 5.0★ - Available - Rongai\n\nRider calls you when 2 mins away!"
-
     if "cart" in msg or "order" in msg or "checkout" in msg or "buy" in msg:
         return f"You have {cart_count} items in cart.\n\nTo order:\n1. Tap + on products to add\n2. Click Cart icon bottom\n3. Enter location + M-Pesa number\n4. Click 'Place Order'\n\nRider assigned in 30 seconds!\n\nNeed help adding something?"
-
     if "price" in msg or "how much" in msg or "cost" in msg:
         return "Tell me which product! For example:\n• 'flour price'\n• 'milk price'\n• 'cheapest bread'\n\nI compare 5 supermarkets to give you cheapest!"
-
     if "stock" in msg or "available" in msg or "left" in msg:
-        stock_info = "\n".join([f"• {p['emoji']} {p['name']}: {p['stock']} left at {p['store']}" for p in PRODUCTS[:5]])
+        stock_info="\n".join([f"• {p['emoji']} {p['name']}: {p['stock']} left at {p['store']}" for p in PRODUCTS[:5]])
         return f"Current stock:\n\n{stock_info}\n\nAll fresh today! Which do you need?"
-
     if "payment" in msg or "mpesa" in msg or "pay" in msg or "cash" in msg:
         return "Payment options:\n\n💚 Lipa na M-Pesa: Enter 2547... number, STK push sent\n💵 Cash on Delivery: Pay rider when he delivers\n\nBoth work! M-Pesa is faster. Which do you prefer?"
-
     if "thank" in msg or "thanks" in msg or "asante" in msg:
         return "You're welcome! 😊 Happy to help!\n\nNeed anything else? Flour, milk, delivery info? I'm here 24/7!"
-
-    # Fallback - intelligent
-    found = []
+    found=[]
     for p in PRODUCTS:
         if any(word in msg for word in p["name"].lower().split() if len(word)>2):
             found.append(p)
-
     if found:
-        p = found[0]
+        p=found[0]
         return f"Found {p['name']}! {p['emoji']}\n\n💰 KES {p['price']} at {p['store']} (was KES {p['old']})\n📦 {p['stock']} in stock\n⭐ {p['rate']} stars, {p['sold']} sold\n\nTap + button on product card to add to cart! Need anything else?"
-
     return f"I understood: '{message}'\n\nI'm LONMA AI - I can:\n\n• Find products: say 'flour' or 'milk'\n• Check cheapest: 'cheapest flour'\n• Delivery: 'will you deliver to Kitengela?'\n• Order help: 'how to order'\n\nTry asking:\n• 'Help me'\n• 'Will you deliver?'\n• 'Cheapest milk'\n• 'What is in stock?'"
 
 @app.get("/", response_class=HTMLResponse)
@@ -180,14 +157,14 @@ async def index():
 
 I know prices from 5 supermarkets and can:
 
-• Find cheapest flour, milk, etc
-• Answer "Will you deliver?"
-• Help you order
+- Find cheapest flour, milk, etc
+- Answer "Will you deliver?"
+- Help you order
 
 Try:
-• "Help me"
-• "Will you deliver to Kitengela?"
-• "Cheapest flour"
+- "Help me"
+- "Will you deliver to Kitengela?"
+- "Cheapest flour"
 </div></div><div class="ai-in"><input id="aiInput" placeholder="Ask anything..." onkeypress="if(event.key==='Enter') sendAI()"><button onclick="sendAI()">Send</button></div></div>
 <div id="cartModal" class="modal"><div class="sheet"><div class="s-h"><h3>Cart (<span id="cartC">0</span>)</h3><div onclick="closeM()" style="width:36px;height:36px;background:var(--bg);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</div></div><div class="s-c"><div id="cartItems"></div><div style="background:var(--bg);border-radius:16px;padding:14px;margin:14px 0"><div style="display:flex;justify-content:space-between;font-size:12px;margin:5px 0"><span>Subtotal</span><b>KES <span id="sub">0</span></b></div><div style="display:flex;justify-content:space-between;font-size:12px;margin:5px 0"><span>Delivery</span><b>KES 100</b></div><div style="display:flex;justify-content:space-between;font-size:14px;font-weight:800;border-top:1px solid var(--border);margin-top:8px;padding-top:10px"><span>Total</span><b>KES <span id="grand">0</span></b></div></div><input id="custName" class="input" placeholder="Full Name"><input id="custPhone" class="input" value="254" placeholder="M-Pesa Phone"><input id="custLoc" class="input" placeholder="Delivery Location"><button class="btn btn-green" onclick="checkout()">Place Order - Rider 30min</button><div id="status" style="text-align:center;font-size:11px;font-weight:700;margin-top:8px"></div><div id="track" style="display:none;margin-top:12px;background:#e8f5e9;border-radius:16px;padding:14px;color:#000"><b>Order <span id="orderId"></span> Confirmed!</b><p style="font-size:11px;margin-top:6px" id="riderInfo">Rider assigned</p></div></div></div></div>
 <div id="riderModal" class="modal"><div class="sheet"><div class="s-h"><h3>Rider Center</h3><div onclick="closeM()" style="width:36px;height:36px;background:var(--bg);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</div></div><div class="s-c"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div style="background:#e0f7fa;padding:14px;border-radius:16px;text-align:center"><b>3</b><br><small style="font-size:10px">Online</small></div><div style="background:#fff3cd;padding:14px;border-radius:16px;text-align:center"><b id="rs2">0</b><br><small style="font-size:10px">Orders</small></div><div style="background:#d4edda;padding:14px;border-radius:16px;text-align:center"><b id="rs3">KES 0</b><br><small style="font-size:10px">Sales</small></div></div><div id="riderList" style="margin-top:14px"></div><div id="riderOrders" style="margin-top:10px"></div></div></div></div>
@@ -321,25 +298,22 @@ async def chat(req: Request):
         b=await req.json()
         msg=b.get("message","")
         cart_count=b.get("cart_count",0)
-        reply = smart_ai_reply(msg, cart_count)
-
-        # Quick reply suggestions based on message
-        quick = []
-        low = msg.lower()
+        reply=smart_ai_reply(msg, cart_count)
+        quick=[]
+        low=msg.lower()
         if "deliver" in low or "bring" in low:
-            quick = ["Yes bring it on", "Where do you deliver?", "Delivery fee?"]
+            quick=["Yes bring it on","Where do you deliver?","Delivery fee?"]
         elif "flour" in low:
-            quick = ["Add flour to cart", "Milk price?", "Cheapest rice?"]
+            quick=["Add flour to cart","Milk price?","Cheapest rice?"]
         elif "help" in low:
-            quick = ["Will you deliver?", "Cheapest flour", "How to order?"]
+            quick=["Will you deliver?","Cheapest flour","How to order?"]
         elif "hello" in low or "hi" in low:
-            quick = ["Help me", "Cheapest flour", "Will you deliver?"]
+            quick=["Help me","Cheapest flour","Will you deliver?"]
         else:
-            quick = ["Help me", "Will you deliver?", "Cheapest flour"]
-
+            quick=["Help me","Will you deliver?","Cheapest flour"]
         return {"reply": reply, "quick": quick}
     except Exception as e:
-        return {"reply": f"I understood: {b.get('message','')} - I can help with delivery, prices, and ordering. Try 'Help me' or 'Will you deliver?'", "quick": ["Help me", "Will you deliver?"]}
+        return {"reply": f"I understood: {b.get('message','')} - I can help with delivery, prices, and ordering. Try 'Help me' or 'Will you deliver?'", "quick": ["Help me","Will you deliver?"]}
 
 @app.post("/user/login")
 async def login_user(req: Request):
@@ -358,28 +332,43 @@ async def stk(req: Request):
         pwd=base64.b64encode(f"{MPESA_SHORTCODE}{MPESA_PASSKEY}{ts}".encode()).decode()
         url="https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest" if MPESA_ENV=="sandbox" else "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
         r=requests.post(url,json={"BusinessShortCode":MPESA_SHORTCODE,"Password":pwd,"Timestamp":ts,"TransactionType":"CustomerPayBillOnline","Amount":int(b.get("amount",1)),"PartyA":b.get("phone"),"PartyB":MPESA_SHORTCODE,"PhoneNumber":b.get("phone"),"CallBackURL":MPESA_CALLBACK_URL,"AccountReference":oid,"TransactionDesc":"LONMA"},headers={"Authorization":f"Bearer {token}"},timeout=10)
-        d=r.json(); d["order_id"]=oid; return d
+        d=r.json()
+        d["order_id"]=oid
+        return d
     except Exception as e:
         return {"ResponseCode":"1","error":str(e),"order_id":f"ORD{random.randint(1000,9999)}"}
 
 @app.get("/riders")
-async def riders(): return RIDERS
+async def riders():
+    return RIDERS
+
 @app.get("/orders")
-async def orders(): return ORDERS[::-1]
+async def orders():
+    return ORDERS[::-1]
+
 @app.post("/rider/accept/{oid}")
 async def acc(oid: str):
     for o in ORDERS:
-        if o["id"]==oid: o["status"]="rider_assigned"
+        if o["id"]==oid:
+            o["status"]="rider_assigned"
     return {"success":True}
+
 @app.get("/mpesa/callback")
-async def cb(): return {"ResultCode":0}
+async def cb():
+    return {"ResultCode":0}
+
 @app.post("/mpesa/callback")
-async def cbp(req: Request): return {"ResultCode":0}
+async def cbp(req: Request):
+    return {"ResultCode":0}
+
 @app.get("/logo.png")
 async def logo():
-    if os.path.exists("logo.png"): return FileResponse("logo.png")
+    if os.path.exists("logo.png"):
+        return FileResponse("logo.png")
     return HTMLResponse("", status_code=404)
+
 @app.get("/favicon.ico")
 async def fav():
-    if os.path.exists("logo.png"): return FileResponse("logo.png")
+    if os.path.exists("logo.png"):
+        return FileResponse("logo.png")
     return HTMLResponse("", status_code=404)
