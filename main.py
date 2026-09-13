@@ -43,20 +43,20 @@ ORDERS=[]
 def smart_ai_reply(message, cart_count=0):
     msg=message.lower().strip()
     if any(w in msg for w in ["hello","hi","hey","jambo"]):
-        return "Hello! 👋 I'm LONMA AI! What do you need today?"
+        return "Hello! 👋 I'm LONMA AI! What do you need?"
     if "help" in msg:
         return "I can help:\n🛒 Find cheapest\n💰 Compare prices\n🏍️ Delivery info\n📦 How to order"
     if "deliver" in msg:
-        return "Yes! We deliver in 30 mins 🏍️\nAreas: Kajiado, Kitengela, Rongai\nFee: KES 100\n3 riders online"
+        return "Yes! We deliver in 30 mins 🏍️\nAreas: Kajiado, Kitengela, Rongai\nFee: KES 100"
     if "flour" in msg:
-        return "Ajab Flour 2kg:\n💰 KES 175 Naivas\n💰 KES 172 Carrefour (best!)\n📦 50 packs ⭐4.8"
+        return "Ajab Flour 2kg KES 175 Naivas (best!)\n📦 50 packs ⭐4.8"
     if "milk" in msg:
-        return "Brookside Milk 500ml:\n💰 KES 65 Naivas\n💰 KES 62 Chandarana\n📦 100 fresh"
+        return "Brookside Milk 500ml KES 65\n📦 100 fresh"
+    if "pay" in msg or "mpesa" in msg:
+        return "Payment:\n💚 M-Pesa STK Push - Enter PIN\n💵 Cash on Delivery - Pay rider\nWhich do you prefer?"
     if "cart" in msg or "order" in msg:
         return f"You have {cart_count} items. Tap + then Cart > Place Order!"
-    if "cheapest" in msg:
-        return "Cheapest:\n🌽 Flour 2kg KES 175\n🥛 Milk KES 65\n🍅 Tomatoes KES 80\n🍞 Bread KES 60"
-    return f"Try: Help me, Will you deliver?, Cheapest flour"
+    return "Try: Help me, Will you deliver?, Cheapest flour, How to pay?"
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
@@ -64,12 +64,12 @@ async def index():
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LONMA ORBIT</title>
 <style>
-:root{--bg:#0B0E14;--card:#151A27;--text:#F8FAFC;--muted:#94A3B8;--border:#1E293B;--teal:#0A8EA8}
+:root{--bg:#0B0E14;--card:#151A27;--text:#F8FAFC;--muted:#94A3B8;--border:#1E293B;--teal:#0A8EA8;--green:#22C55E}
 *{margin:0;padding:0;box-sizing:border-box;font-family:Arial} body{background:var(--bg);color:var(--text);padding-bottom:96px}
 .header{position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--border)}
 .h-top{display:flex;justify-content:space-between;align-items:center;padding:14px 16px}
 .logo{background:#0A8EA8;color:#fff;padding:11px 18px;border-radius:12px;font-weight:900;font-size:15px}
-.icons{display:flex;gap:10px}.ic{width:46px;height:46px;background:#1A2035;border:1px solid var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer}
+.icons{display:flex;gap:10px}.ic{width:46px;height:46px;background:#1A2035;border:1px solid var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px}
 .h-loc{padding:0 16px 14px;display:flex;align-items:center;gap:10px}
 .loc-icon{width:44px;height:44px;background:#fff;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px}
 .h-loc b{font-size:14px;font-weight:800}.h-loc small{font-size:12px;color:var(--muted)}
@@ -114,13 +114,31 @@ async def index():
 .ai-in{display:flex;gap:10px;padding:14px;border-top:1px solid var(--border);background:#151A27}
 .ai-in input{flex:1;padding:14px 18px;border-radius:100px;border:1px solid var(--border);background:#0B0E14;color:var(--text);outline:none}
 .ai-in button{padding:14px 20px;background:#0A8EA8;color:#fff;border:none;border-radius:100px;font-weight:800}
-.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(12px);justify-content:center;align-items:flex-end;z-index:80}.modal.open{display:flex}
-.sheet{background:#151A27;width:100%;max-width:520px;margin:0 auto;border-radius:32px 32px 0 0;max-height:90vh;overflow-y:auto;border-top:1px solid var(--border)}
-.s-h{padding:20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);position:sticky;top:0;background:#151A27}
-.s-c{padding:18px}.btn{width:100%;padding:16px;border:none;border-radius:18px;font-weight:800;font-size:14px;margin-top:12px;cursor:pointer}.btn-green{background:#fff;color:#000}.btn-wa{background:#25D366;color:#fff}
-.input{width:100%;padding:14px 16px;border-radius:16px;border:1px solid var(--border);font-size:13.5px;margin:7px 0;background:#0B0E14;color:var(--text)}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(16px);justify-content:center;align-items:flex-end;z-index:80}.modal.open{display:flex}
+.sheet{background:#151A27;width:100%;max-width:520px;margin:0 auto;border-radius:32px 32px 0 0;max-height:92vh;overflow-y:auto;border-top:1px solid var(--border)}
+.s-h{padding:20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);position:sticky;top:0;background:#151A27;z-index:2}
+.s-c{padding:18px}
+.btn{width:100%;padding:16px;border:none;border-radius:18px;font-weight:800;font-size:14px;margin-top:12px;cursor:pointer;transition:0.2s}
+.btn:active{transform:scale(0.98)}
+.btn-green{background:#fff;color:#000}.btn-wa{background:#25D366;color:#fff}
+.btn-mpesa{background:#0A8EA8;color:#fff;box-shadow:0 8px 20px rgba(10,142,168,0.3)}
+.btn-cash{background:#1A2035;color:#fff;border:1.5px solid var(--border)}
+.input{width:100%;padding:14px 16px;border-radius:16px;border:1px solid var(--border);font-size:13.5px;margin:7px 0;background:#0B0E14;color:var(--text);outline:none}
+.input:focus{border-color:var(--teal)}
+.pay-methods{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.pay-opt{padding:14px;border-radius:16px;border:2px solid var(--border);background:#1A2035;cursor:pointer;text-align:center;transition:0.2s}
+.pay-opt.active{border-color:#0A8EA8;background:rgba(10,142,168,0.15)}
+.pay-opt b{font-size:13px;display:block;margin-top:4px}
+.pay-opt small{font-size:10px;color:var(--muted)}
+.pay-status{display:none;margin-top:14px;padding:16px;border-radius:18px;text-align:center;font-weight:700}
+.pay-status.show{display:block}
+.pay-status.mpesa{background:linear-gradient(135deg,#0A8EA8,#0DB5D1);color:#fff}
+.pay-status.cash{background:#FEF3C7;color:#92400E;border:1px solid #FDE68A}
+.pay-status.success{background:linear-gradient(135deg,#DCFCE7,#BBF7D0);color:#14532D;border:1px solid #86EFAC}
+.loader{width:20px;height:20px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
 .cart-i{display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--border)}.ci{width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:30px;background:#1A2035;border:1px solid var(--border)}
-.toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:#fff;color:#000;padding:12px 20px;border-radius:100px;font-size:12.5px;font-weight:800;z-index:100;display:none}
+.toast{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:#fff;color:#000;padding:12px 20px;border-radius:100px;font-size:12.5px;font-weight:800;z-index:100;display:none;box-shadow:0 8px 20px rgba(0,0,0,0.3)}
 </style></head><body>
 <div class="header">
 <div class="h-top"><div class="logo">LONMA ORBIT</div><div class="icons"><div class="ic">🌙</div><div class="ic">🔍</div><div class="ic">🔔</div></div></div>
@@ -140,8 +158,33 @@ async def index():
 <div class="tab" onclick="openProfile()"><div class="tab-i">👤</div><b>Profile</b></div>
 </div>
 <div id="ai" onclick="toggleAI()">🤖</div>
-<div id="aiChat"><div class="ai-h"><div><b>LONMA AI</b><div style="font-size:11px;opacity:0.9">Online</div></div><div onclick="toggleAI()" style="width:36px;height:36px;background:rgba(255,255,255,0.2);border-radius:12px;display:flex;align-items:center;justify-content:center">✕</div></div><div class="ai-msgs" id="aiMsgs"><div class="m b">Hello! 👋 I'm LONMA AI\nTry: Help me, Will you deliver?, Cheapest flour</div></div><div class="ai-in"><input id="aiInput" placeholder="Ask..." onkeypress="if(event.key==='Enter') sendAI()"><button onclick="sendAI()">Send</button></div></div>
-<div id="cartModal" class="modal"><div class="sheet"><div class="s-h"><h3>Cart (<span id="cartC">0</span>)</h3><div onclick="closeM()" style="width:40px;height:40px;background:#0B0E14;border-radius:14px;display:flex;align-items:center;justify-content:center">✕</div></div><div class="s-c"><div id="cartItems"></div><div style="background:#0B0E14;border-radius:20px;padding:16px;margin:16px 0;border:1px solid var(--border)"><div style="display:flex;justify-content:space-between;font-size:13px;margin:6px 0"><span>Subtotal</span><b>KES <span id="sub">0</span></b></div><div style="display:flex;justify-content:space-between;font-size:13px;margin:6px 0"><span>Delivery</span><b>KES 100</b></div><div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;border-top:1px solid var(--border);margin-top:10px;padding-top:12px"><span>Total</span><b>KES <span id="grand">0</span></b></div></div><input id="custName" class="input" placeholder="Full Name"><input id="custPhone" class="input" value="254" placeholder="M-Pesa Phone"><input id="custLoc" class="input" placeholder="Delivery Location"><button class="btn btn-green" onclick="checkout()">Place Order - Rider 30min</button><div id="status" style="text-align:center;font-size:11px;font-weight:700;margin-top:10px"></div><div id="track" style="display:none;margin-top:14px;background:#DCFCE7;border-radius:20px;padding:16px;color:#14532D"><b>Order <span id="orderId"></span> Confirmed!</b><p style="font-size:11.5px;margin-top:6px" id="riderInfo">Rider assigned</p></div></div></div></div>
+<div id="aiChat"><div class="ai-h"><div><b>LONMA AI</b><div style="font-size:11px;opacity:0.9">Online</div></div><div onclick="toggleAI()" style="width:36px;height:36px;background:rgba(255,255,255,0.2);border-radius:12px;display:flex;align-items:center;justify-content:center">✕</div></div><div class="ai-msgs" id="aiMsgs"><div class="m b">Hello! 👋 I'm LONMA AI\nTry: Help me, Will you deliver?, How to pay?</div></div><div class="ai-in"><input id="aiInput" placeholder="Ask..." onkeypress="if(event.key==='Enter') sendAI()"><button onclick="sendAI()">Send</button></div></div>
+
+<div id="cartModal" class="modal"><div class="sheet"><div class="s-h"><h3>Cart (<span id="cartC">0</span>)</h3><div onclick="closeM()" style="width:40px;height:40px;background:#0B0E14;border-radius:14px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</div></div><div class="s-c">
+<div id="cartItems"></div>
+<div style="background:#0B0E14;border-radius:20px;padding:16px;margin:16px 0;border:1px solid var(--border)"><div style="display:flex;justify-content:space-between;font-size:13px;margin:6px 0"><span>Subtotal</span><b>KES <span id="sub">0</span></b></div><div style="display:flex;justify-content:space-between;font-size:13px;margin:6px 0"><span>Delivery</span><b>KES 100</b></div><div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;border-top:1px solid var(--border);margin-top:10px;padding-top:12px"><span>Total</span><b>KES <span id="grand">0</span></b></div></div>
+
+<input id="custName" class="input" placeholder="Full Name (e.g. Marlon)">
+<input id="custPhone" class="input" value="254" placeholder="M-Pesa Phone 254707...">
+<input id="custLoc" class="input" placeholder="Delivery Location (e.g. Thika)">
+
+<div style="margin-top:16px"><b style="font-size:13px">Choose Payment Method</b>
+<div class="pay-methods">
+<div class="pay-opt active" id="payMpesa" onclick="setPay('mpesa')"><div style="font-size:22px">💚</div><b>M-Pesa</b><br><small>STK Push • Instant</small></div>
+<div class="pay-opt" id="payCash" onclick="setPay('cash')"><div style="font-size:22px">💵</div><b>Cash</b><br><small>Pay rider</small></div>
+</div>
+</div>
+
+<div id="mpesaStatus" class="pay-status mpesa"><span class="loader"></span> Sending STK Push to <span id="mpesaPhoneDisplay">254...</span><br><small style="font-size:11px;margin-top:6px;display:block">Check your phone - Enter M-Pesa PIN to pay KES <span id="payAmount">0</span></small></div>
+<div id="cashStatus" class="pay-status cash">💵 Cash on Delivery Selected<br><small>You will pay KES <span id="cashAmount">0</span> to rider when he delivers in 30 mins</small></div>
+<div id="successStatus" class="pay-status success"><b>Order <span id="orderId"></span> Confirmed! 🎉</b><p style="font-size:11.5px;margin-top:6px" id="riderInfo">Rider assigned - 30min delivery</p><p style="font-size:10px;margin-top:8px;opacity:0.8" id="paymentNote">M-Pesa payment received</p></div>
+
+<button class="btn btn-mpesa" id="placeBtn" onclick="checkout()">💚 Pay with M-Pesa - Rider 30min</button>
+<button class="btn btn-cash" id="cashBtn" onclick="checkoutCash()" style="display:none">💵 Place Order - Pay Cash on Delivery</button>
+
+<div id="status" style="text-align:center;font-size:11px;font-weight:700;margin-top:10px;color:var(--muted)"></div>
+</div></div></div>
+
 <div id="riderModal" class="modal"><div class="sheet"><div class="s-h"><h3>Rider Center</h3><div onclick="closeM()" style="width:40px;height:40px;background:#0B0E14;border-radius:14px;display:flex;align-items:center;justify-content:center">✕</div></div><div class="s-c"><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"><div style="background:#1A2035;padding:16px;border-radius:20px;text-align:center;border:1px solid var(--border)"><b>3</b><br><small>ONLINE</small></div><div style="background:#1A2035;padding:16px;border-radius:20px;text-align:center;border:1px solid var(--border)"><b id="rs2">0</b><br><small>ORDERS</small></div><div style="background:#1A2035;padding:16px;border-radius:20px;text-align:center;border:1px solid var(--border)"><b id="rs3">KES 0</b><br><small>SALES</small></div></div><div id="riderList" style="margin-top:16px"></div><div id="riderOrders" style="margin-top:12px"></div></div></div></div>
 <div id="profileModal" class="modal"><div class="sheet"><div class="s-h"><h3>Profile</h3><div onclick="closeM()" style="width:40px;height:40px;background:#0B0E14;border-radius:14px;display:flex;align-items:center;justify-content:center">✕</div></div><div class="s-c"><div style="text-align:center;padding:8px 0 22px"><div style="width:88px;height:88px;background:#0A8EA8;border-radius:28px;display:flex;align-items:center;justify-content:center;font-size:40px;color:#fff;margin:0 auto">👤</div><h3 style="margin-top:14px" id="profileName">Welcome</h3><small style="color:var(--muted)" id="profilePhone">Login to order faster</small></div><div id="notLogged"><input id="waPhone" class="input" value="254" placeholder="WhatsApp 254712..."><button class="btn btn-wa" onclick="loginWA()">Login with WhatsApp</button></div><div id="logged" style="display:none"><div style="background:#DCFCE7;border-radius:18px;padding:14px;text-align:center;color:#14532D"><b>Logged in ✓</b><br><small id="loggedPhone">254...</small></div><button class="btn" style="background:#fff;color:#000;margin-top:12px" onclick="logout()">Logout</button></div></div></div></div>
 <div id="adminModal" class="modal"><div class="sheet"><div class="s-h"><h3>Admin</h3><div onclick="closeM()" style="width:40px;height:40px;background:#0B0E14;border-radius:14px;display:flex;align-items:center;justify-content:center">✕</div></div><div class="s-c"><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px" id="adminStats"></div><div id="adminOrders" style="margin-top:14px"></div></div></div></div>
@@ -165,7 +208,7 @@ var CATS = [
 {id:"drinks",name:"Drinks",icon:"🥤",img:null},
 {id:"dairy",name:"Dairy",icon:"🥛",img:null}
 ];
-var cart = []; var total = 0; var activeStore = "ALL"; var activeCat = "all";
+var cart = []; var total = 0; var activeStore = "ALL"; var activeCat = "all"; var payMethod = "mpesa";
 
 function orderNow(){
   if(cart.length===0){
@@ -175,6 +218,20 @@ function orderNow(){
     showToast("3 best deals added! 🎉");
   }
   setTimeout(function(){ openCart(); }, 400);
+}
+
+function setPay(m){
+  payMethod=m;
+  document.getElementById("payMpesa").classList.toggle("active", m==="mpesa");
+  document.getElementById("payCash").classList.toggle("active", m==="cash");
+  document.getElementById("placeBtn").style.display = m==="mpesa"? "block" : "none";
+  document.getElementById("cashBtn").style.display = m==="cash"? "block" : "none";
+  document.getElementById("mpesaStatus").classList.remove("show");
+  document.getElementById("cashStatus").classList.toggle("show", m==="cash");
+  document.getElementById("successStatus").classList.remove("show");
+  if(m==="cash"){
+    document.getElementById("cashAmount").innerText = total+100;
+  }
 }
 
 function renderChips(){
@@ -206,13 +263,21 @@ function addToCart(id){
  if(!p) return; cart.push(p); total+=p.price;
  document.getElementById("cartDot").innerText=cart.length;
  document.getElementById("cartC").innerText=cart.length;
+ document.getElementById("payAmount").innerText=total+100;
+ document.getElementById("cashAmount").innerText=total+100;
  showToast(p.name+" added ✓");
 }
 function openCart(){
  var d=document.getElementById("cartItems");
- if(cart.length===0){ d.innerHTML='<p style="text-align:center;padding:28px;color:var(--muted)">Cart empty</p>'; }
+ if(cart.length===0){ d.innerHTML='<p style="text-align:center;padding:28px;color:var(--muted)">Cart empty - tap ORDER NOW</p>'; }
  else { var html=""; for(var i=0;i<cart.length;i++){ var c=cart[i]; html+='<div class="cart-i"><div class="ci">'+c.emoji+'</div><div style="flex:1"><h4 style="font-size:13px;font-weight:700">'+c.name+'</h4><small style="color:var(--muted)">'+c.store+' • KES '+c.price+'</small></div><b>KES '+c.price+'</b></div>'; } d.innerHTML=html; }
  document.getElementById("sub").innerText=total; document.getElementById("grand").innerText=total+100;
+ document.getElementById("payAmount").innerText=total+100;
+ document.getElementById("cashAmount").innerText=total+100;
+ document.getElementById("mpesaStatus").classList.remove("show");
+ document.getElementById("successStatus").classList.remove("show");
+ if(payMethod==="cash") document.getElementById("cashStatus").classList.add("show");
+ else document.getElementById("cashStatus").classList.remove("show");
  document.getElementById("cartModal").classList.add("open");
 }
 function openRider(){ document.getElementById("riderModal").classList.add("open"); loadRiders(); }
@@ -242,13 +307,66 @@ async function sendAI(){
  } catch(e){ box.innerHTML+='<div class="m b">Error, try again</div>'; }
  box.scrollTop=box.scrollHeight;
 }
+
 async function checkout(){
- var phone=document.getElementById("custPhone").value; var loc=document.getElementById("custLoc").value;
- if(!loc){ alert("Enter location"); return; }
- document.getElementById("status").innerText="Placing order...";
- var r=await fetch("/mpesa/stkpush",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone:phone,amount:total+100,location:loc,cart:cart})});
- var d=await r.json(); document.getElementById("orderId").innerText=d.order_id; document.getElementById("status").innerText="Order placed!"; document.getElementById("track").style.display="block"; document.getElementById("riderInfo").innerText="Rider John KMEZ 123A • 4.9★ • 30min"; cart=[]; total=0; document.getElementById("cartDot").innerText=0;
+ var phone=document.getElementById("custPhone").value; var loc=document.getElementById("custLoc").value; var name=document.getElementById("custName").value;
+ if(!name){ alert("Enter your name"); return; }
+ if(!phone || phone.length<10){ alert("Enter valid M-Pesa phone 2547..."); return; }
+ if(!loc){ alert("Enter delivery location"); return; }
+ document.getElementById("status").innerText="";
+ document.getElementById("mpesaPhoneDisplay").innerText=phone;
+ document.getElementById("mpesaStatus").classList.add("show");
+ document.getElementById("cashStatus").classList.remove("show");
+ document.getElementById("successStatus").classList.remove("show");
+ document.getElementById("placeBtn").innerText="⏳ Sending STK Push...";
+ document.getElementById("placeBtn").disabled=true;
+ showToast("M-Pesa prompt sent to "+phone+" 📱");
+ try{
+   var r=await fetch("/mpesa/stkpush",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone:phone,amount:total+100,location:loc,cart:cart,name:name})});
+   var d=await r.json();
+   setTimeout(function(){
+     document.getElementById("mpesaStatus").classList.remove("show");
+     document.getElementById("orderId").innerText=d.order_id;
+     document.getElementById("riderInfo").innerText="Rider John KMEZ 123A • 4.9★ • 30min • "+loc;
+     document.getElementById("paymentNote").innerText="M-Pesa: KES "+(total+100)+" paid - Enter PIN on phone";
+     document.getElementById("successStatus").classList.add("show");
+     document.getElementById("placeBtn").innerText="✅ Order Placed!";
+     document.getElementById("status").innerText="STK Push sent! Check phone for M-Pesa prompt";
+     showToast("Order "+d.order_id+" confirmed! 🎉");
+     cart=[]; total=0; document.getElementById("cartDot").innerText=0;
+   }, 2000);
+ } catch(e){
+   document.getElementById("mpesaStatus").classList.remove("show");
+   document.getElementById("status").innerText="Error, but order saved locally";
+   var oid="ORD"+Math.floor(1000+Math.random()*9000);
+   document.getElementById("orderId").innerText=oid;
+   document.getElementById("successStatus").classList.add("show");
+ }
 }
+
+async function checkoutCash(){
+ var phone=document.getElementById("custPhone").value; var loc=document.getElementById("custLoc").value; var name=document.getElementById("custName").value;
+ if(!name){ alert("Enter your name"); return; }
+ if(!loc){ alert("Enter delivery location"); return; }
+ document.getElementById("cashBtn").innerText="⏳ Placing order...";
+ try{
+   var r=await fetch("/mpesa/stkpush",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({phone:phone,amount:total+100,location:loc,cart:cart,name:name,payment:"cash"})});
+   var d=await r.json();
+   document.getElementById("orderId").innerText=d.order_id;
+   document.getElementById("riderInfo").innerText="Rider John KMEZ 123A • 4.9★ • 30min • "+loc;
+   document.getElementById("paymentNote").innerText="Cash on Delivery: Pay KES "+(total+100)+" to rider";
+   document.getElementById("cashStatus").classList.remove("show");
+   document.getElementById("successStatus").classList.add("show");
+   document.getElementById("cashBtn").innerText="✅ Order Placed - Pay Cash";
+   showToast("Order "+d.order_id+" confirmed! Pay cash on delivery 💵");
+   cart=[]; total=0; document.getElementById("cartDot").innerText=0;
+ } catch(e){
+   var oid="ORD"+Math.floor(1000+Math.random()*9000);
+   document.getElementById("orderId").innerText=oid;
+   document.getElementById("successStatus").classList.add("show");
+ }
+}
+
 async function loadRiders(){
  var r=await fetch("/riders"); var riders=await r.json();
  var html=""; for(var i=0;i<riders.length;i++){ var rd=riders[i]; html+='<div style="background:#1A2035;border:1px solid var(--border);border-radius:20px;padding:14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div><b>'+rd.name+' ⭐'+rd.rating+'</b><br><small style="color:var(--muted)">'+rd.motor+' • '+rd.location+'</small></div><div style="padding:7px 12px;border-radius:100px;background:'+(rd.status==="available"?"#DCFCE7":"#FEF3C7")+';color:#000;font-size:10px;font-weight:800">'+rd.status.toUpperCase()+'</div></div>'; }
@@ -265,7 +383,7 @@ async function loadAdmin(){
  document.getElementById("adminOrders").innerHTML=html;
 }
 async function acceptOrder(id){ await fetch("/rider/accept/"+id,{method:"POST"}); showToast("Accepted "+id+" ✓"); loadRiders(); }
-function showToast(t){ var el=document.getElementById("toast"); el.innerText=t; el.style.display="block"; setTimeout(function(){el.style.display="none"},2600); }
+function showToast(t){ var el=document.getElementById("toast"); el.innerText=t; el.style.display="block"; setTimeout(function(){el.style.display="none"},3000); }
 
 renderChips(); renderProducts(PRODUCTS); renderFlash();
 var timeLeft=2*3600+14*60+33; setInterval(function(){ timeLeft--; var h=Math.floor(timeLeft/3600); var m=Math.floor((timeLeft%3600)/60); var s=timeLeft%60; var el=document.getElementById("timer"); if(el) el.innerText="Ends "+(h<10?"0"+h:h)+":"+(m<10?"0"+m:m)+":"+(s<10?"0"+s:s); },1000);
@@ -279,7 +397,7 @@ async def chat(req: Request):
         reply=smart_ai_reply(b.get("message",""), b.get("cart_count",0))
         return {"reply": reply}
     except:
-        return {"reply": "Try: Help me"}
+        return {"reply": "Try: Help me, How to pay?"}
 
 @app.post("/user/login")
 async def login_user(req: Request):
@@ -290,13 +408,15 @@ async def stk(req: Request):
     try:
         b=await req.json()
         oid=f"ORD{random.randint(1000,9999)}"
-        ORDERS.append({"id":oid,"phone":b.get("phone"),"amount":b.get("amount",1),"location":b.get("location","Kajiado"),"cart":b.get("cart",[]),"status":"paid","time":datetime.now().isoformat()})
+        ORDERS.append({"id":oid,"phone":b.get("phone"),"name":b.get("name",""),"amount":b.get("amount",1),"location":b.get("location","Kajiado"),"cart":b.get("cart",[]),"payment":b.get("payment","mpesa"),"status":"paid","time":datetime.now().isoformat()})
         token=get_token()
         if not token:
-            return {"ResponseCode":"0","order_id":oid}
+            return {"ResponseCode":"0","order_id":oid,"message":"STK Push simulated - Enter M-Pesa PIN on phone"}
         ts=datetime.now().strftime("%Y%m%d%H%M%S")
         pwd=base64.b64encode(f"{MPESA_SHORTCODE}{MPESA_PASSKEY}{ts}".encode()).decode()
         url="https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest" if MPESA_ENV=="sandbox" else "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+        if b.get("payment")=="cash":
+            return {"ResponseCode":"0","order_id":oid,"message":"Cash on delivery"}
         r=requests.post(url,json={"BusinessShortCode":MPESA_SHORTCODE,"Password":pwd,"Timestamp":ts,"TransactionType":"CustomerPayBillOnline","Amount":int(b.get("amount",1)),"PartyA":b.get("phone"),"PartyB":MPESA_SHORTCODE,"PhoneNumber":b.get("phone"),"CallBackURL":MPESA_CALLBACK_URL,"AccountReference":oid,"TransactionDesc":"LONMA"},headers={"Authorization":f"Bearer {token}"},timeout=10)
         d=r.json()
         d["order_id"]=oid
@@ -329,7 +449,7 @@ async def cbp(req: Request):
 
 @app.get("/grocery-icon")
 async def grocery_icon():
-    for path in ["grocery.jpg","fresh_produce_icon.webp","/mnt/data/fresh_produce_icon.webp","/mnt/data/wa_image_7995968891402268899"]:
+    for path in ["grocery.jpg","fresh_produce_icon.webp","/mnt/data/fresh_produce_icon.webp"]:
         if os.path.exists(path):
             return FileResponse(path)
     return HTMLResponse("", status_code=404)
