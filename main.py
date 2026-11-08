@@ -1,17 +1,53 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os, sqlite3, json, datetime, requests, base64
+import os, sqlite3, json, datetime, requests, base64, time, re
 from threading import Thread
-import time
+from collections import defaultdict
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# ===== CONFIG =====
 DARAJA_KEY = os.getenv("DARAJA_KEY",""); DARAJA_SECRET=os.getenv("DARAJA_SECRET","")
 DARAJA_SHORTCODE=os.getenv("DARAJA_SHORTCODE","174379"); DARAJA_PASSKEY=os.getenv("DARAJA_PASSKEY","")
 DARAJA_CALLBACK=os.getenv("CALLBACK_URL","https://app.lonmaorbit.co.ke/mpesa/callback")
 USE_PROD=os.getenv("DARAJA_ENV","sandbox")=="production"
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD","Lonma#2026!Secure")
+
+# ===== SECURITY v6.0 =====
+FAILED = defaultdict(list)
+BLOCKED = {}
+def is_blocked(ip):
+    now=time.time()
+    FAILED[ip]=[t for t in FAILED[ip] if now-t<300]
+    if ip in BLOCKED and now < BLOCKED[ip]:
+        return True
+    if len(FAILED[ip])>=5:
+        BLOCKED[ip]=now+900
+        return True
+    return False
+def record_fail(ip): FAILED[ip].append(time.time())
+def clean_input(s, maxlen=100):
+    if not isinstance(s,str): return ""
+    s=s.strip()[:maxlen]
+    s=re.sub(r'[<>\"\'`;]', '', s)
+    return s
+
+@app.middleware("http")
+async def security_middleware(request, call_next):
+    path=request.url.path.lower()
+    bad=[".env","wp-admin","phpmyadmin",".git","config","admin.php",".sql","wp-login"]
+    if any(b in path for b in bad):
+        return HTMLResponse("Not Found", status_code=404)
+    response=await call_next(request)
+    response.headers["X-Content-Type-Options"]="nosniff"
+    response.headers["X-Frame-Options"]="DENY"
+    response.headers["X-XSS-Protection"]="1; mode=block"
+    response.headers["Strict-Transport-Security"]="max-age=31536000"
+    response.headers["Content-Security-Policy"]="default-src 'self' 'unsafe-inline' https: data:"
+    response.headers["Referrer-Policy"]="strict-origin-when-cross-origin"
+    return response
 
 conn=sqlite3.connect("lonma.db",check_same_thread=False)
 conn.execute("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, name TEXT, price INTEGER, code TEXT, image TEXT, category TEXT, stock INTEGER)")
@@ -61,35 +97,57 @@ def prods_api():
 
 @app.get("/images/{name}")
 def serve_img(name:str):
-    for p in [f"images/{name}", name, f"./images/{name}"]:
+    name=re.sub(r'[^a-zA-Z0-9._-]','',name)
+    for p in [f"images/{name}", name]:
         if os.path.exists(p): return FileResponse(p)
-    return FileResponse("images/p1.jpg") if os.path.exists("images/p1.jpg") else HTMLResponse("",404)
+    return HTMLResponse("",404)
 
 @app.get("/api/verify/{code}")
 def verify(code:str):
-    cur=conn.cursor(); cur.execute("SELECT name FROM products WHERE code=?",(code.upper(),))
+    code=clean_input(code,20).upper()
+    cur=conn.cursor(); cur.execute("SELECT name FROM products WHERE code=?",(code,))
     row=cur.fetchone(); return {"valid":True,"product":{"name":row[0]}} if row else {"valid":False}
 
 @app.get("/api/orders")
 def orders_api(phone:str=""):
+    phone=clean_input(phone,15)
     cur=conn.cursor()
     if phone: cur.execute("SELECT order_no,name,total,status,created FROM orders WHERE phone=? ORDER BY id DESC",(phone,))
     else: cur.execute("SELECT order_no,name,total,status,created FROM orders ORDER BY id DESC LIMIT 50")
     return [{"order_no":r[0],"name":r[1],"total":r[2],"status":r[3],"created":r[4]} for r in cur.fetchall()]
 
+@app.post("/api/admin/check")
+async def admin_check(req:Request):
+    ip=req.client.host if req.client else "unknown"
+    if is_blocked(ip): return {"status":"blocked","message":"Too many tries. Wait 15 mins"}
+    d=await req.json()
+    if d.get("password","")==ADMIN_PASSWORD:
+        FAILED[ip]=[]
+        return {"status":"ok"}
+    record_fail(ip)
+    return {"status":"error","message":"Wrong password"}
+
 @app.get("/api/admin/orders")
-def admin_orders():
+def admin_orders(password:str=""):
+    if password!=ADMIN_PASSWORD: return []
     cur=conn.cursor(); cur.execute("SELECT order_no,name,phone,total,status,created FROM orders ORDER BY id DESC")
     return [{"order_no":r[0],"name":r[1],"phone":r[2],"total":r[3],"status":r[4],"created":r[5]} for r in cur.fetchall()]
 
 @app.post("/mpesa/stkpush")
 async def stk(req:Request):
     d=await req.json()
-    raw=d.get('phone','').strip(); phone=raw.replace(" ","").replace("+254","0")
+    raw=clean_input(d.get('phone',''),15); phone=raw.replace(" ","").replace("+254","0")
     if phone.startswith("0"): phone="254"+phone[1:]
-    phone="".join([c for c in phone if c.isdigit()]); amount=int(d.get('amount',1))
+    phone="".join([c for c in phone if c.isdigit()])
+    try: amount=int(d.get('amount',1))
+    except: amount=1
+    if amount<1 or amount>500000: return {"status":"error","message":"Invalid amount"}
+    if len(phone)!=12: return {"status":"error","message":"Invalid phone"}
     order_no='LONMA'+datetime.datetime.now().strftime("%H%M%S")
-    conn.execute("INSERT INTO orders (order_no,name,phone,area,location,items,total,status,created,mpesa_receipt,checkout_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",(order_no,d.get('name','Guest'),raw,d.get('area'),d.get('location'),json.dumps(d.get('cart',[])),amount,'Pending',datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),"",order_no))
+    name=clean_input(d.get('name','Guest'),50)
+    area=clean_input(d.get('area',''),20)
+    loc=clean_input(d.get('location',''),100)
+    conn.execute("INSERT INTO orders (order_no,name,phone,area,location,items,total,status,created,mpesa_receipt,checkout_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",(order_no,name,raw,area,loc,json.dumps(d.get('cart',[]))[:2000],amount,'Pending',datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),"",order_no))
     conn.commit()
     if DARAJA_KEY and DARAJA_PASSKEY:
         token=get_token()
@@ -109,7 +167,8 @@ async def stk(req:Request):
 
 @app.post("/api/auth/register")
 async def reg(req:Request):
-    d=await req.json(); phone=d.get("phone","").strip(); name=d.get("name","").strip(); pwd=d.get("password","").strip()
+    d=await req.json(); phone=clean_input(d.get("phone",""),15); name=clean_input(d.get("name",""),50); pwd=d.get("password","").strip()[:50]
+    if len(phone)<10 or len(pwd)<4: return {"status":"error","message":"Invalid input"}
     cur=conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?",(phone,)); 
     if cur.fetchone(): return {"status":"error","message":"Exists"}
     cur.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)",(phone,name,pwd)); conn.commit()
@@ -117,8 +176,15 @@ async def reg(req:Request):
 
 @app.post("/api/auth/login")
 async def log(req:Request):
-    d=await req.json(); cur=conn.cursor(); cur.execute("SELECT phone,name FROM users WHERE phone=? AND password=?",(d.get("phone","").strip(),d.get("password","").strip()))
-    row=cur.fetchone(); return {"status":"ok","user":{"phone":row[0],"name":row[1]}} if row else {"status":"error","message":"Wrong"}
+    ip=req.client.host if req.client else "unknown"
+    if is_blocked(ip): return {"status":"error","message":"Too many tries. Wait 15 mins"}
+    d=await req.json(); cur=conn.cursor(); cur.execute("SELECT phone,name FROM users WHERE phone=? AND password=?",(clean_input(d.get("phone",""),15),d.get("password","").strip()[:50]))
+    row=cur.fetchone()
+    if not row:
+        record_fail(ip)
+        return {"status":"error","message":"Wrong"}
+    FAILED[ip]=[]
+    return {"status":"ok","user":{"phone":row[0],"name":row[1]}}
 
 HTML="""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LONMA ORBIT</title><style>
 :root{--teal:#0A9EBB;--dark:#0f172a;--line:#e2e8f0}*{box-sizing:border-box}body{margin:0;font-family:Inter,-apple-system,Arial;background:#f8fafc;color:var(--dark)}
@@ -143,18 +209,18 @@ input,select,textarea{width:100%;padding:14px;border-radius:14px;border:1px soli
 </style></head><body>
 <div class="nav"><div class="nav-top"><div class="logo" onclick="show('products')"><img src="/logo.png"><b>LONMA ORBIT</b></div><div class="cart-pill" onclick="show('cart')">CART <span id="cartCount" class="cart-num" style="display:none">0</span></div></div><div class="search-wrap"><div class="search-box"><span class="burger" onclick="openMenu()">☰</span><input id="searchInput" placeholder="Search Diva, Detrex, Sawa..." oninput="filterProducts()"></div></div><div class="cat-chips"><div class="chip active" onclick="filterCat('All',this)">All</div><div class="chip" onclick="filterCat('Soaps',this)">Soaps</div><div class="chip" onclick="filterCat('Lotions',this)">Lotions</div><div class="chip" onclick="filterCat('Pomades',this)">Pomades</div><div class="chip" onclick="filterCat('Cooking Oils',this)">Oils</div></div></div>
 <div class="overlay" id="overlay" onclick="closeMenu()"></div>
-<div class="side" id="side"><div class="top-box"><div style="text-align:right"><span style="background:rgba(255,255,255,.15);padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer" onclick="show('cart');closeMenu()">VIEW CART</span></div><div class="lc" onclick="show('products');closeMenu()"><img src="/logo.png"></div><div style="font-weight:800;font-size:19px;margin-top:12px">LONMA ORBIT</div><div style="opacity:.8;font-size:12px;margin-top:4px">100% Genuine • Fast Delivery</div></div><div class="menu"><div class="label">SHOP</div><div class="mi" onclick="show('products');closeMenu()"><div class="ico" style="background:#f0fdfa">🏠</div><b>Home • Products</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="mi" onclick="show('cart');closeMenu()"><div class="ico" style="background:#fef3c7">🛒</div><b>Cart</b><span class="tag" style="background:#f1f5f9" id="mc">0</span></div><div class="mi" onclick="show('orders');closeMenu()"><div class="ico" style="background:#dbeafe">📦</div><b>Orders</b></div><div class="div"></div><div class="label">SUPPORT</div><div class="mi" onclick="show('scan');closeMenu()"><div class="ico" style="background:#dcfce7">🛡️</div><b>Verify Product</b></div><div class="mi" onclick="show('account');closeMenu()"><div class="ico" style="background:#f1f5f9">👤</div><b>My Account</b></div><div class="mi" onclick="show('terms');closeMenu()"><div class="ico" style="background:#fef3c7">📄</div><b>Terms</b></div><div class="div"></div><div class="mi" onclick="show('admin');closeMenu()" style="opacity:.6"><div class="ico" style="background:#0f172a;color:#fff">🔐</div><b>Admin</b></div><div style="text-align:center;padding:18px;color:#94a3b8;font-size:11px">v5.0 Real Images • 🇰🇪</div></div></div>
+<div class="side" id="side"><div class="top-box"><div style="text-align:right"><span style="background:rgba(255,255,255,.15);padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer" onclick="show('cart');closeMenu()">VIEW CART</span></div><div class="lc" onclick="show('products');closeMenu()"><img src="/logo.png"></div><div style="font-weight:800;font-size:19px;margin-top:12px">LONMA ORBIT</div><div style="opacity:.8;font-size:12px;margin-top:4px">100% Genuine • Fast Delivery • Secured 🔒</div></div><div class="menu"><div class="label">SHOP</div><div class="mi" onclick="show('products');closeMenu()"><div class="ico" style="background:#f0fdfa">🏠</div><b>Home • Products</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="mi" onclick="show('cart');closeMenu()"><div class="ico" style="background:#fef3c7">🛒</div><b>Cart</b><span class="tag" style="background:#f1f5f9" id="mc">0</span></div><div class="mi" onclick="show('orders');closeMenu()"><div class="ico" style="background:#dbeafe">📦</div><b>Orders</b></div><div class="div"></div><div class="label">SUPPORT</div><div class="mi" onclick="show('scan');closeMenu()"><div class="ico" style="background:#dcfce7">🛡️</div><b>Verify Product</b></div><div class="mi" onclick="show('account');closeMenu()"><div class="ico" style="background:#f1f5f9">👤</div><b>My Account</b></div><div class="mi" onclick="show('terms');closeMenu()"><div class="ico" style="background:#fef3c7">📄</div><b>Terms</b></div><div class="div"></div><div class="mi" onclick="show('admin');closeMenu()" style="opacity:.6"><div class="ico" style="background:#0f172a;color:#fff">🔐</div><b>Admin</b></div><div style="text-align:center;padding:18px;color:#94a3b8;font-size:11px">v6.0 Secured • 🇰🇪</div></div></div>
 <div id="products" class="page active"><div class="banner"><div><div style="font-weight:800;font-size:15px">FREE Delivery</div><div style="font-size:12px;opacity:.9">Orders over KSh 2000</div></div><div style="background:#fff;color:var(--dark);padding:6px 14px;border-radius:20px;font-weight:800;font-size:12px">SHOP NOW</div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">Products</h3><span style="font-size:12px;color:#64748b" id="pCount">9 items</span></div><div id="plist"></div></div>
 <div id="cart" class="page"><h3>Cart</h3><div id="cartItems"></div><div id="cartSum" style="display:none"><div class="card" style="display:block"><div style="display:flex;justify-content:space-between"><span>Subtotal (<span id="tItems">0</span>)</span><b>KSh <span id="sub">0</span></b></div><div style="display:flex;justify-content:space-between;margin-top:8px"><span>Delivery</span><b id="delFee"></b></div><div style="display:flex;justify-content:space-between;margin-top:12px;font-size:18px;border-top:1px solid #f1f5f9;padding-top:12px"><span>Total</span><b>KSh <span id="tot">0</span></b></div><div style="margin-top:16px"><input id="custName" placeholder="Full Name"><input id="phone" placeholder="M-Pesa 07..."><select id="area"><option value="">Select Area</option><option value="CBD">CBD - 150</option><option value="Westlands">Westlands - 200</option><option value="Upcountry">Upcountry - 350</option></select><textarea id="loc" placeholder="Exact location / building"></textarea><label style="font-size:12px;display:flex;gap:8px;align-items:center;margin:12px 0"><input type="checkbox" id="agree" style="width:auto"> I agree to <a href="#" onclick="show('terms');return false" style="color:#0A9EBB;font-weight:800">Terms</a></label></div><button class="btn" onclick="checkout()">Pay KSh <span id="pay">0</span> with M-Pesa</button><p id="ps" style="text-align:center;font-size:13px"></p></div></div><div id="emptyCart" class="card" style="text-align:center;padding:30px;display:block"><div style="font-size:40px">🛒</div><h4>Your cart is empty</h4><button class="btn btn-teal" onclick="show('products')">Start Shopping</button></div></div>
 <div id="orders" class="page"><h3>Orders</h3><div style="display:flex;gap:8px;margin-bottom:12px"><input id="phLookup" placeholder="Enter phone 07..."><button class="btn" style="width:auto;padding:10px 20px" onclick="loadOrders()">Load</button></div><div id="olist"></div><div id="noOrd" class="card" style="text-align:center;display:block"><p>No orders yet</p></div></div>
 <div id="scan" class="page"><h3>Verify Authenticity</h3><div class="card" style="display:block;padding:20px;text-align:center"><div style="font-size:40px">🛡️</div><h4>Check Product</h4><p style="font-size:12px;color:#64748b">Enter code like DIV-001</p><input id="vcode" placeholder="DIV-001"><button class="btn btn-teal" onclick="verify()" style="margin-top:10px">Verify Now</button><p id="vres" style="font-weight:700;margin-top:12px"></p></div></div>
 <div id="account" class="page"><div id="out"><div class="card" style="display:block"><h4>Create Account</h4><input id="rn" placeholder="Full name"><input id="rp" placeholder="07xxxxxxxx"><input id="rpass" type="password" placeholder="Password"><button class="btn" onclick="register()">Create Account</button><p id="rs"></p></div><div class="card" style="display:block"><h4>Sign In</h4><input id="lp" placeholder="07xxxxxxxx"><input id="lpass" type="password" placeholder="Password"><button class="btn" style="background:var(--teal)" onclick="login()">Sign In</button><p id="ls"></p></div></div><div id="in" style="display:none"><div class="card" style="display:block;background:var(--dark);color:#fff;text-align:center;padding:24px"><h3 id="an" style="margin:12px 0 4px">Welcome</h3><p id="ap" style="opacity:.7;font-size:13px"></p><button class="btn" style="background:#fff;color:var(--dark);margin-top:16px" onclick="logout()">Sign Out</button></div></div></div>
-<div id="terms" class="page"><h3>Terms & Conditions</h3><div class="card" style="display:block;line-height:1.7;font-size:13px;padding:18px"><h4>1. Delivery</h4><p>CBD KSh 150, Westlands KSh 200, Upcountry KSh 350. FREE for orders KSh 2000+.</p><h4>2. Payments</h4><p>All payments via M-Pesa STK Push. Order confirmed after receipt.</p><h4>3. Authenticity</h4><p>100% genuine Pwani products. Verify code.</p><h4>4. Returns</h4><p>Returns within 24hrs if unopened with receipt.</p><p style="margin-top:16px;font-size:11px;color:#94a3b8">v5.0 • Made in Kenya 🇰🇪</p><button class="btn" style="margin-top:14px" onclick="show('cart')">Back to Cart</button></div></div>
-<div id="admin" class="page"><h3>Admin</h3><div class="card" style="display:block"><input id="apass" type="password" placeholder="Password"><button class="btn" onclick="adminLogin()">Login</button><p id="ast"></p></div><div id="acont" style="display:none"><div id="alist"></div></div></div>
+<div id="terms" class="page"><h3>Terms & Conditions</h3><div class="card" style="display:block;line-height:1.7;font-size:13px;padding:18px"><h4>1. Delivery</h4><p>CBD KSh 150, Westlands KSh 200, Upcountry KSh 350. FREE for orders KSh 2000+.</p><h4>2. Payments</h4><p>All payments via M-Pesa STK Push. Order confirmed after receipt.</p><h4>3. Authenticity</h4><p>100% genuine Pwani products. Verify code.</p><h4>4. Returns</h4><p>Returns within 24hrs if unopened with receipt.</p><h4>5. Security</h4><p>Your data is protected. Failed logins blocked after 5 tries.</p><p style="margin-top:16px;font-size:11px;color:#94a3b8">v6.0 Secured • Made in Kenya 🇰🇪</p><button class="btn" style="margin-top:14px" onclick="show('cart')">Back to Cart</button></div></div>
+<div id="admin" class="page"><h3>Admin 🔒</h3><div class="card" style="display:block"><input id="apass" type="password" placeholder="Admin Password"><button class="btn" onclick="adminLogin()">Secure Login</button><p id="ast"></p></div><div id="acont" style="display:none"><div id="alist"></div></div></div>
 <div id="receipt" class="page"><div class="card" style="display:block;text-align:center;padding:24px" id="rcont"></div><button class="btn" onclick="show('products')">Continue Shopping</button></div>
 <div class="bottom"><div id="b-products" class="active" onclick="show('products')">🏠<br>Home</div><div id="b-cart" onclick="show('cart')">🛒<br>Cart</div><div id="b-orders" onclick="show('orders')">📦<br>Orders</div><div id="b-account" onclick="show('account')">👤<br>Account</div></div>
 <script>
-let all=[],cart=[],myOrders=JSON.parse(localStorage.getItem('my_orders')||'[]'),activeCat='All';
+let all=[],cart=[],myOrders=JSON.parse(localStorage.getItem('my_orders')||'[]'),activeCat='All',adminPass='';
 try{let s=localStorage.getItem('lonma_cart');if(s)cart=JSON.parse(s);}catch(e){cart=[];}
 function save(){localStorage.setItem('lonma_cart',JSON.stringify(cart));updateCount();}
 function updateCount(){let c=0;for(let i of cart)c+=i.qty;let el=document.getElementById('cartCount');if(el){el.innerText=c;el.style.display=c>0?'flex':'none';}document.getElementById('mc').innerText=c;}
@@ -171,7 +237,7 @@ async function loadP(){let r=await fetch('/api/products');all=await r.json();ren
 async function verify(){let c=document.getElementById('vcode').value.trim();let r=await fetch('/api/verify/'+c);let d=await r.json();document.getElementById('vres').innerText=d.valid?'✅ Authentic: '+d.product.name:'❌ Invalid Code';}
 async function checkout(){let name=document.getElementById('custName').value.trim(),phone=document.getElementById('phone').value.trim(),area=document.getElementById('area').value,loc=document.getElementById('loc').value.trim();if(!name||!phone||!area||!loc||!document.getElementById('agree').checked){document.getElementById('ps').innerText='Fill all fields + agree to Terms';return;}let sub=0;for(let i of cart)sub+=i.price*i.qty;let del=area==='CBD'?150:area==='Upcountry'?350:200;if(sub>=2000)del=0;let tot=sub+del;document.getElementById('ps').innerText='Sending M-Pesa prompt...';let r=await fetch('/mpesa/stkpush',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,amount:tot,cart,name,area,location:loc})});let d=await r.json();document.getElementById('ps').innerText=d.message;if(d.status==='ok'){myOrders.unshift({order_no:d.order_no,total:tot,status:'Pending',created:new Date().toLocaleString()});localStorage.setItem('my_orders',JSON.stringify(myOrders));document.getElementById('rcont').innerHTML=`<div style="font-size:50px">✅</div><h3>${d.order_no}</h3><p>Total KSh ${tot}</p><p style="font-size:12px;color:#64748b">Check phone for M-Pesa prompt</p>`;cart=[];localStorage.removeItem('lonma_cart');save();show('receipt');}}
 async function loadOrders(){let ph=document.getElementById('phLookup').value.trim();let r=await fetch('/api/orders?phone='+ph);let data=await r.json();document.getElementById('olist').innerHTML=data.map(o=>`<div class="card" style="display:block"><div style="display:flex;justify-content:space-between"><b>${o.order_no}</b><span style="background:#f1f5f9;padding:4px 10px;border-radius:20px;font-size:11px">${o.status}</span></div><div style="margin-top:6px">KSh ${o.total} • ${o.created}</div></div>`).join('');document.getElementById('noOrd').style.display=data.length?'none':'block';}
-async function adminLogin(){let p=document.getElementById('apass').value;if(p!=='lonma2024'){document.getElementById('ast').innerText='Wrong';return;}document.getElementById('acont').style.display='block';let r=await fetch('/api/admin/orders');let d=await r.json();document.getElementById('alist').innerHTML=d.map(o=>`<div class="card" style="display:block"><b>${o.order_no}</b> ${o.phone} - KSh ${o.total} - ${o.status}</div>`).join('');}
+async function adminLogin(){let p=document.getElementById('apass').value;let r=await fetch('/api/admin/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})});let d=await r.json();document.getElementById('ast').innerText=d.message||'';if(d.status==='ok'){adminPass=p;document.getElementById('acont').style.display='block';let r2=await fetch('/api/admin/orders?password='+encodeURIComponent(p));let orders=await r2.json();document.getElementById('alist').innerHTML=orders.map(o=>`<div class="card" style="display:block"><b>${o.order_no}</b> ${o.phone} - KSh ${o.total} - ${o.status}</div>`).join('')||'No orders';}}
 async function register(){let name=document.getElementById('rn').value.trim(),phone=document.getElementById('rp').value.trim(),pass=document.getElementById('rpass').value.trim();let r=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,password:pass})});let d=await r.json();document.getElementById('rs').innerText=d.status==='ok'?'Created':'Error';if(d.status==='ok'){localStorage.setItem('lonma_user',JSON.stringify(d.user));show('products');}}
 async function login(){let phone=document.getElementById('lp').value.trim(),pass=document.getElementById('lpass').value.trim();let r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,password:pass})});let d=await r.json();document.getElementById('ls').innerText=d.status==='ok'?'Welcome':'Wrong';if(d.status==='ok'){localStorage.setItem('lonma_user',JSON.stringify(d.user));show('products');}}
 function logout(){localStorage.removeItem('lonma_user');show('account');}
@@ -188,7 +254,6 @@ def logo():
         if os.path.exists(f): return FileResponse(f)
     return HTMLResponse("",200)
 
-# keep-alive anti-sleep
 def keep_alive():
     while True:
         time.sleep(500)
