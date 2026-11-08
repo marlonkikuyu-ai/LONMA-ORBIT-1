@@ -8,45 +8,35 @@ from collections import defaultdict
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-# ===== CONFIG =====
 DARAJA_KEY = os.getenv("DARAJA_KEY",""); DARAJA_SECRET=os.getenv("DARAJA_SECRET","")
 DARAJA_SHORTCODE=os.getenv("DARAJA_SHORTCODE","174379"); DARAJA_PASSKEY=os.getenv("DARAJA_PASSKEY","")
 DARAJA_CALLBACK=os.getenv("CALLBACK_URL","https://app.lonmaorbit.co.ke/mpesa/callback")
 USE_PROD=os.getenv("DARAJA_ENV","sandbox")=="production"
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD","Lonma#2026!Secure")
 
-# ===== SECURITY v6.0 =====
-FAILED = defaultdict(list)
-BLOCKED = {}
+FAILED = defaultdict(list); BLOCKED = {}
 def is_blocked(ip):
     now=time.time()
     FAILED[ip]=[t for t in FAILED[ip] if now-t<300]
-    if ip in BLOCKED and now < BLOCKED[ip]:
-        return True
+    if ip in BLOCKED and now < BLOCKED[ip]: return True
     if len(FAILED[ip])>=5:
-        BLOCKED[ip]=now+900
-        return True
+        BLOCKED[ip]=now+900; return True
     return False
 def record_fail(ip): FAILED[ip].append(time.time())
 def clean_input(s, maxlen=100):
     if not isinstance(s,str): return ""
-    s=s.strip()[:maxlen]
-    s=re.sub(r'[<>\"\'`;]', '', s)
-    return s
+    s=s.strip()[:maxlen]; s=re.sub(r'[<>\"\'`;]', '', s); return s
 
 @app.middleware("http")
 async def security_middleware(request, call_next):
     path=request.url.path.lower()
     bad=[".env","wp-admin","phpmyadmin",".git","config","admin.php",".sql","wp-login"]
-    if any(b in path for b in bad):
-        return HTMLResponse("Not Found", status_code=404)
+    if any(b in path for b in bad): return HTMLResponse("Not Found", status_code=404)
     response=await call_next(request)
     response.headers["X-Content-Type-Options"]="nosniff"
     response.headers["X-Frame-Options"]="DENY"
     response.headers["X-XSS-Protection"]="1; mode=block"
     response.headers["Strict-Transport-Security"]="max-age=31536000"
-    response.headers["Content-Security-Policy"]="default-src 'self' 'unsafe-inline' https: data:"
-    response.headers["Referrer-Policy"]="strict-origin-when-cross-origin"
     return response
 
 conn=sqlite3.connect("lonma.db",check_same_thread=False)
@@ -54,16 +44,17 @@ conn.execute("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, name 
 conn.execute("CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, order_no TEXT, name TEXT, phone TEXT, area TEXT, location TEXT, items TEXT, total INTEGER, status TEXT, created TEXT, mpesa_receipt TEXT, checkout_id TEXT)")
 conn.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, phone TEXT UNIQUE, name TEXT, password TEXT)")
 cur=conn.cursor(); cur.execute("DELETE FROM products")
+# image field now = emoji + color, NO FILE NEEDED
 PRODS=[
-(1,"Diva Anti-Dandruff Pomade 250ml",250,"DIV-001","p1.jpg","Pomades",45),
-(2,"Detrex Pine Drops Soap 110g",95,"DET-002","p2.jpg","Soaps",80),
-(3,"Fresh Fri Cooking Oil 2L",890,"FRE-003","p3.jpg","Cooking Oils",50),
-(4,"Detrex Citronella Soap 110g",95,"DET-004","p4.jpg","Soaps",100),
-(5,"Sawa Men Lotion 72Hrs",320,"SAW-005","p5.jpg","Lotions",12),
-(6,"Detrex Cool Mint Soap 110g",95,"DET-006","p6.jpg","Soaps",4),
-(7,"Diva Anti-Breakage Pomade 250ml",250,"DIV-007","p7.jpg","Pomades",30),
-(8,"Sawa Cocoa Butter Lotion 72Hrs",320,"SAW-008","p8.jpg","Lotions",28),
-(9,"Detrex Germ Protection Soap 110g",95,"DET-009","p9.jpg","Soaps",60),
+(1,"Diva Anti-Dandruff Pomade 250ml",250,"DIV-001","💇|#fce7f3","Pomades",45),
+(2,"Detrex Pine Drops Soap 110g",95,"DET-002","🧼|#dcfce7","Soaps",80),
+(3,"Fresh Fri Cooking Oil 2L",890,"FRE-003","🍳|#fef3c7","Cooking Oils",50),
+(4,"Detrex Citronella Soap 110g",95,"DET-004","🧼|#fef9c3","Soaps",100),
+(5,"Sawa Men Lotion 72Hrs",320,"SAW-005","🧴|#dbeafe","Lotions",12),
+(6,"Detrex Cool Mint Soap 110g",95,"DET-006","🧼|#ccfbf1","Soaps",4),
+(7,"Diva Anti-Breakage Pomade 250ml",250,"DIV-007","💇|#f3e8ff","Pomades",30),
+(8,"Sawa Cocoa Butter Lotion 72Hrs",320,"SAW-008","🧴|#ffedd5","Lotions",28),
+(9,"Detrex Germ Protection Soap 110g",95,"DET-009","🧼|#fee2e2","Soaps",60),
 ]
 for pid,name,price,code,img,cat,stock in PRODS:
     cur.execute("INSERT INTO products VALUES (?,?,?,?,?,?,?)",(pid,name,price,code,img,cat,stock))
@@ -79,39 +70,28 @@ def get_token():
 @app.api_route("/mpesa/callback",methods=["GET","POST"])
 async def callback(request:Request):
     try:
-        data=await request.json()
-        stk=data.get("Body",{}).get("stkCallback",{})
+        data=await request.json(); stk=data.get("Body",{}).get("stkCallback",{})
         if stk.get("ResultCode")==0:
             receipt=""
             for it in stk.get("CallbackMetadata",{}).get("Item",[]):
                 if it.get("Name")=="MpesaReceiptNumber": receipt=it.get("Value")
-            conn.execute("UPDATE orders SET status='PAID', mpesa_receipt=? WHERE checkout_id=?",(receipt,stk.get("CheckoutRequestID","")))
-            conn.commit()
+            conn.execute("UPDATE orders SET status='PAID', mpesa_receipt=? WHERE checkout_id=?",(receipt,stk.get("CheckoutRequestID",""))); conn.commit()
         return {"ResultCode":0,"ResultDesc":"Accepted"}
     except: return {"ResultCode":0,"ResultDesc":"Accepted"}
 
 @app.get("/api/products")
 def prods_api():
     cur=conn.cursor(); cur.execute("SELECT id,name,price,code,image,category,stock FROM products")
-    return [{"id":r[0],"name":r[1],"price":r[2],"code":r[3],"image":f"/images/{r[4]}","category":r[5],"stock":r[6]} for r in cur.fetchall()]
-
-@app.get("/images/{name}")
-def serve_img(name:str):
-    name=re.sub(r'[^a-zA-Z0-9._-]','',name)
-    for p in [f"images/{name}", name]:
-        if os.path.exists(p): return FileResponse(p)
-    return HTMLResponse("",404)
+    return [{"id":r[0],"name":r[1],"price":r[2],"code":r[3],"image":r[4],"category":r[5],"stock":r[6]} for r in cur.fetchall()]
 
 @app.get("/api/verify/{code}")
 def verify(code:str):
-    code=clean_input(code,20).upper()
-    cur=conn.cursor(); cur.execute("SELECT name FROM products WHERE code=?",(code,))
-    row=cur.fetchone(); return {"valid":True,"product":{"name":row[0]}} if row else {"valid":False}
+    code=clean_input(code,20).upper(); cur=conn.cursor(); cur.execute("SELECT name FROM products WHERE code=?",(code,)); row=cur.fetchone()
+    return {"valid":True,"product":{"name":row[0]}} if row else {"valid":False}
 
 @app.get("/api/orders")
 def orders_api(phone:str=""):
-    phone=clean_input(phone,15)
-    cur=conn.cursor()
+    phone=clean_input(phone,15); cur=conn.cursor()
     if phone: cur.execute("SELECT order_no,name,total,status,created FROM orders WHERE phone=? ORDER BY id DESC",(phone,))
     else: cur.execute("SELECT order_no,name,total,status,created FROM orders ORDER BY id DESC LIMIT 50")
     return [{"order_no":r[0],"name":r[1],"total":r[2],"status":r[3],"created":r[4]} for r in cur.fetchall()]
@@ -122,10 +102,8 @@ async def admin_check(req:Request):
     if is_blocked(ip): return {"status":"blocked","message":"Too many tries. Wait 15 mins"}
     d=await req.json()
     if d.get("password","")==ADMIN_PASSWORD:
-        FAILED[ip]=[]
-        return {"status":"ok"}
-    record_fail(ip)
-    return {"status":"error","message":"Wrong password"}
+        FAILED[ip]=[]; return {"status":"ok"}
+    record_fail(ip); return {"status":"error","message":"Wrong password"}
 
 @app.get("/api/admin/orders")
 def admin_orders(password:str=""):
@@ -135,8 +113,7 @@ def admin_orders(password:str=""):
 
 @app.post("/mpesa/stkpush")
 async def stk(req:Request):
-    d=await req.json()
-    raw=clean_input(d.get('phone',''),15); phone=raw.replace(" ","").replace("+254","0")
+    d=await req.json(); raw=clean_input(d.get('phone',''),15); phone=raw.replace(" ","").replace("+254","0")
     if phone.startswith("0"): phone="254"+phone[1:]
     phone="".join([c for c in phone if c.isdigit()])
     try: amount=int(d.get('amount',1))
@@ -144,21 +121,16 @@ async def stk(req:Request):
     if amount<1 or amount>500000: return {"status":"error","message":"Invalid amount"}
     if len(phone)!=12: return {"status":"error","message":"Invalid phone"}
     order_no='LONMA'+datetime.datetime.now().strftime("%H%M%S")
-    name=clean_input(d.get('name','Guest'),50)
-    area=clean_input(d.get('area',''),20)
-    loc=clean_input(d.get('location',''),100)
-    conn.execute("INSERT INTO orders (order_no,name,phone,area,location,items,total,status,created,mpesa_receipt,checkout_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",(order_no,name,raw,area,loc,json.dumps(d.get('cart',[]))[:2000],amount,'Pending',datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),"",order_no))
-    conn.commit()
+    name=clean_input(d.get('name','Guest'),50); area=clean_input(d.get('area',''),20); loc=clean_input(d.get('location',''),100)
+    conn.execute("INSERT INTO orders (order_no,name,phone,area,location,items,total,status,created,mpesa_receipt,checkout_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",(order_no,name,raw,area,loc,json.dumps(d.get('cart',[]))[:2000],amount,'Pending',datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),"",order_no)); conn.commit()
     if DARAJA_KEY and DARAJA_PASSKEY:
         token=get_token()
         if token:
-            ts=datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-            pwd=base64.b64encode(f"{DARAJA_SHORTCODE}{DARAJA_PASSKEY}{ts}".encode()).decode()
+            ts=datetime.datetime.now().strftime("%Y%m%d%H%M%S"); pwd=base64.b64encode(f"{DARAJA_SHORTCODE}{DARAJA_PASSKEY}{ts}".encode()).decode()
             payload={"BusinessShortCode":DARAJA_SHORTCODE,"Password":pwd,"Timestamp":ts,"TransactionType":"CustomerPayBillOnline","Amount":amount,"PartyA":phone,"PartyB":DARAJA_SHORTCODE,"PhoneNumber":phone,"CallBackURL":DARAJA_CALLBACK,"AccountReference":order_no,"TransactionDesc":order_no}
             try:
                 base="https://api.safaricom.co.ke" if USE_PROD else "https://sandbox.safaricom.co.ke"
-                r=requests.post(f"{base}/mpesa/stkpush/v1/processrequest",json=payload,headers={"Authorization":f"Bearer {token}"},timeout=15)
-                res=r.json()
+                r=requests.post(f"{base}/mpesa/stkpush/v1/processrequest",json=payload,headers={"Authorization":f"Bearer {token}"},timeout=15); res=r.json()
                 if res.get("ResponseCode")=="0":
                     conn.execute("UPDATE orders SET checkout_id=? WHERE order_no=?",(res.get("CheckoutRequestID",order_no),order_no)); conn.commit()
                     return {"status":"ok","message":f"STK sent to {raw}","order_no":order_no}
@@ -169,7 +141,7 @@ async def stk(req:Request):
 async def reg(req:Request):
     d=await req.json(); phone=clean_input(d.get("phone",""),15); name=clean_input(d.get("name",""),50); pwd=d.get("password","").strip()[:50]
     if len(phone)<10 or len(pwd)<4: return {"status":"error","message":"Invalid input"}
-    cur=conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?",(phone,)); 
+    cur=conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?",(phone,))
     if cur.fetchone(): return {"status":"error","message":"Exists"}
     cur.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)",(phone,name,pwd)); conn.commit()
     return {"status":"ok","user":{"phone":phone,"name":name}}
@@ -178,13 +150,9 @@ async def reg(req:Request):
 async def log(req:Request):
     ip=req.client.host if req.client else "unknown"
     if is_blocked(ip): return {"status":"error","message":"Too many tries. Wait 15 mins"}
-    d=await req.json(); cur=conn.cursor(); cur.execute("SELECT phone,name FROM users WHERE phone=? AND password=?",(clean_input(d.get("phone",""),15),d.get("password","").strip()[:50]))
-    row=cur.fetchone()
-    if not row:
-        record_fail(ip)
-        return {"status":"error","message":"Wrong"}
-    FAILED[ip]=[]
-    return {"status":"ok","user":{"phone":row[0],"name":row[1]}}
+    d=await req.json(); cur=conn.cursor(); cur.execute("SELECT phone,name FROM users WHERE phone=? AND password=?",(clean_input(d.get("phone",""),15),d.get("password","").strip()[:50])); row=cur.fetchone()
+    if not row: record_fail(ip); return {"status":"error","message":"Wrong"}
+    FAILED[ip]=[]; return {"status":"ok","user":{"phone":row[0],"name":row[1]}}
 
 HTML="""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LONMA ORBIT</title><style>
 :root{--teal:#0A9EBB;--dark:#0f172a;--line:#e2e8f0}*{box-sizing:border-box}body{margin:0;font-family:Inter,-apple-system,Arial;background:#f8fafc;color:var(--dark)}
@@ -198,7 +166,7 @@ HTML="""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" c
 .page{display:none;padding:168px 14px 90px;max-width:480px;margin:0 auto}.page.active{display:block}
 .banner{background:linear-gradient(135deg,#0A9EBB 0%,#0f172a 100%);color:#fff;border-radius:20px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .card{background:#fff;border-radius:20px;padding:12px;margin:10px 0;border:1px solid #f1f5f9;box-shadow:0 4px 16px rgba(15,23,42,.04);display:flex;gap:12px}
-.card img{width:90px;height:90px;object-fit:contain;border-radius:14px;background:#f8fafc;flex-shrink:0}
+.pimg{width:90px;height:90px;border-radius:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:38px}
 .btn{background:var(--dark);color:#fff;border:none;padding:14px;border-radius:30px;width:100%;font-weight:800;cursor:pointer}.btn-teal{background:var(--teal)}
 input,select,textarea{width:100%;padding:14px;border-radius:14px;border:1px solid var(--line);margin:6px 0;font-size:14px;background:#fff}
 .bottom{position:fixed;bottom:0;width:100%;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:10px 0;z-index:1000}
@@ -209,13 +177,13 @@ input,select,textarea{width:100%;padding:14px;border-radius:14px;border:1px soli
 </style></head><body>
 <div class="nav"><div class="nav-top"><div class="logo" onclick="show('products')"><img src="/logo.png"><b>LONMA ORBIT</b></div><div class="cart-pill" onclick="show('cart')">CART <span id="cartCount" class="cart-num" style="display:none">0</span></div></div><div class="search-wrap"><div class="search-box"><span class="burger" onclick="openMenu()">☰</span><input id="searchInput" placeholder="Search Diva, Detrex, Sawa..." oninput="filterProducts()"></div></div><div class="cat-chips"><div class="chip active" onclick="filterCat('All',this)">All</div><div class="chip" onclick="filterCat('Soaps',this)">Soaps</div><div class="chip" onclick="filterCat('Lotions',this)">Lotions</div><div class="chip" onclick="filterCat('Pomades',this)">Pomades</div><div class="chip" onclick="filterCat('Cooking Oils',this)">Oils</div></div></div>
 <div class="overlay" id="overlay" onclick="closeMenu()"></div>
-<div class="side" id="side"><div class="top-box"><div style="text-align:right"><span style="background:rgba(255,255,255,.15);padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer" onclick="show('cart');closeMenu()">VIEW CART</span></div><div class="lc" onclick="show('products');closeMenu()"><img src="/logo.png"></div><div style="font-weight:800;font-size:19px;margin-top:12px">LONMA ORBIT</div><div style="opacity:.8;font-size:12px;margin-top:4px">100% Genuine • Fast Delivery • Secured 🔒</div></div><div class="menu"><div class="label">SHOP</div><div class="mi" onclick="show('products');closeMenu()"><div class="ico" style="background:#f0fdfa">🏠</div><b>Home • Products</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="mi" onclick="show('cart');closeMenu()"><div class="ico" style="background:#fef3c7">🛒</div><b>Cart</b><span class="tag" style="background:#f1f5f9" id="mc">0</span></div><div class="mi" onclick="show('orders');closeMenu()"><div class="ico" style="background:#dbeafe">📦</div><b>Orders</b></div><div class="div"></div><div class="label">SUPPORT</div><div class="mi" onclick="show('scan');closeMenu()"><div class="ico" style="background:#dcfce7">🛡️</div><b>Verify Product</b></div><div class="mi" onclick="show('account');closeMenu()"><div class="ico" style="background:#f1f5f9">👤</div><b>My Account</b></div><div class="mi" onclick="show('terms');closeMenu()"><div class="ico" style="background:#fef3c7">📄</div><b>Terms</b></div><div class="div"></div><div class="mi" onclick="show('admin');closeMenu()" style="opacity:.6"><div class="ico" style="background:#0f172a;color:#fff">🔐</div><b>Admin</b></div><div style="text-align:center;padding:18px;color:#94a3b8;font-size:11px">v6.0 Secured • 🇰🇪</div></div></div>
-<div id="products" class="page active"><div class="banner"><div><div style="font-weight:800;font-size:15px">FREE Delivery</div><div style="font-size:12px;opacity:.9">Orders over KSh 2000</div></div><div style="background:#fff;color:var(--dark);padding:6px 14px;border-radius:20px;font-weight:800;font-size:12px">SHOP NOW</div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">Products</h3><span style="font-size:12px;color:#64748b" id="pCount">9 items</span></div><div id="plist"></div></div>
+<div class="side" id="side"><div class="top-box"><div style="text-align:right"><span style="background:rgba(255,255,255,.15);padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer" onclick="show('cart');closeMenu()">VIEW CART</span></div><div class="lc" onclick="show('products');closeMenu()"><img src="/logo.png"></div><div style="font-weight:800;font-size:19px;margin-top:12px">LONMA ORBIT</div><div style="opacity:.8;font-size:12px;margin-top:4px">100% Genuine • Fast Delivery • Secured 🔒</div></div><div class="menu"><div class="label">SHOP</div><div class="mi" onclick="show('products');closeMenu()"><div class="ico" style="background:#f0fdfa">🏠</div><b>Home • Products</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="mi" onclick="show('cart');closeMenu()"><div class="ico" style="background:#fef3c7">🛒</div><b>Cart</b><span class="tag" style="background:#f1f5f9" id="mc">0</span></div><div class="mi" onclick="show('orders');closeMenu()"><div class="ico" style="background:#dbeafe">📦</div><b>Orders</b></div><div class="div"></div><div class="label">SUPPORT</div><div class="mi" onclick="show('scan');closeMenu()"><div class="ico" style="background:#dcfce7">🛡️</div><b>Verify Product</b></div><div class="mi" onclick="show('account');closeMenu()"><div class="ico" style="background:#f1f5f9">👤</div><b>My Account</b></div><div class="mi" onclick="show('terms');closeMenu()"><div class="ico" style="background:#fef3c7">📄</div><b>Terms</b></div><div class="div"></div><div class="mi" onclick="show('admin');closeMenu()" style="opacity:.6"><div class="ico" style="background:#0f172a;color:#fff">🔐</div><b>Admin</b></div><div style="text-align:center;padding:18px;color:#94a3b8;font-size:11px">v6.1 Sorted • 🇰🇪</div></div></div>
+<div id="products" class="page active"><div class="banner"><div><div style="font-weight:800;font-size:15px">FREE Delivery</div><div style="font-size:12px;opacity:.9">Orders over KSh 2000</div></div><div style="background:#fff;color:var(--dark);padding:6px 14px;border-radius:20px;font-weight:800;font-size:12px">SHOP NOW</div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px"><h3 style="margin:0">Products</h3><select id="sortSelect" onchange="filterProducts()" style="width:auto;padding:8px 12px;font-size:12px;font-weight:700;margin:0"><option value="featured">Sort: Featured</option><option value="low">Price: Low → High</option><option value="high">Price: High → Low</option><option value="name">Name: A → Z</option></select></div><div style="text-align:right;font-size:12px;color:#64748b;margin-bottom:4px" id="pCount">9 items</div><div id="plist"></div></div>
 <div id="cart" class="page"><h3>Cart</h3><div id="cartItems"></div><div id="cartSum" style="display:none"><div class="card" style="display:block"><div style="display:flex;justify-content:space-between"><span>Subtotal (<span id="tItems">0</span>)</span><b>KSh <span id="sub">0</span></b></div><div style="display:flex;justify-content:space-between;margin-top:8px"><span>Delivery</span><b id="delFee"></b></div><div style="display:flex;justify-content:space-between;margin-top:12px;font-size:18px;border-top:1px solid #f1f5f9;padding-top:12px"><span>Total</span><b>KSh <span id="tot">0</span></b></div><div style="margin-top:16px"><input id="custName" placeholder="Full Name"><input id="phone" placeholder="M-Pesa 07..."><select id="area"><option value="">Select Area</option><option value="CBD">CBD - 150</option><option value="Westlands">Westlands - 200</option><option value="Upcountry">Upcountry - 350</option></select><textarea id="loc" placeholder="Exact location / building"></textarea><label style="font-size:12px;display:flex;gap:8px;align-items:center;margin:12px 0"><input type="checkbox" id="agree" style="width:auto"> I agree to <a href="#" onclick="show('terms');return false" style="color:#0A9EBB;font-weight:800">Terms</a></label></div><button class="btn" onclick="checkout()">Pay KSh <span id="pay">0</span> with M-Pesa</button><p id="ps" style="text-align:center;font-size:13px"></p></div></div><div id="emptyCart" class="card" style="text-align:center;padding:30px;display:block"><div style="font-size:40px">🛒</div><h4>Your cart is empty</h4><button class="btn btn-teal" onclick="show('products')">Start Shopping</button></div></div>
 <div id="orders" class="page"><h3>Orders</h3><div style="display:flex;gap:8px;margin-bottom:12px"><input id="phLookup" placeholder="Enter phone 07..."><button class="btn" style="width:auto;padding:10px 20px" onclick="loadOrders()">Load</button></div><div id="olist"></div><div id="noOrd" class="card" style="text-align:center;display:block"><p>No orders yet</p></div></div>
 <div id="scan" class="page"><h3>Verify Authenticity</h3><div class="card" style="display:block;padding:20px;text-align:center"><div style="font-size:40px">🛡️</div><h4>Check Product</h4><p style="font-size:12px;color:#64748b">Enter code like DIV-001</p><input id="vcode" placeholder="DIV-001"><button class="btn btn-teal" onclick="verify()" style="margin-top:10px">Verify Now</button><p id="vres" style="font-weight:700;margin-top:12px"></p></div></div>
 <div id="account" class="page"><div id="out"><div class="card" style="display:block"><h4>Create Account</h4><input id="rn" placeholder="Full name"><input id="rp" placeholder="07xxxxxxxx"><input id="rpass" type="password" placeholder="Password"><button class="btn" onclick="register()">Create Account</button><p id="rs"></p></div><div class="card" style="display:block"><h4>Sign In</h4><input id="lp" placeholder="07xxxxxxxx"><input id="lpass" type="password" placeholder="Password"><button class="btn" style="background:var(--teal)" onclick="login()">Sign In</button><p id="ls"></p></div></div><div id="in" style="display:none"><div class="card" style="display:block;background:var(--dark);color:#fff;text-align:center;padding:24px"><h3 id="an" style="margin:12px 0 4px">Welcome</h3><p id="ap" style="opacity:.7;font-size:13px"></p><button class="btn" style="background:#fff;color:var(--dark);margin-top:16px" onclick="logout()">Sign Out</button></div></div></div>
-<div id="terms" class="page"><h3>Terms & Conditions</h3><div class="card" style="display:block;line-height:1.7;font-size:13px;padding:18px"><h4>1. Delivery</h4><p>CBD KSh 150, Westlands KSh 200, Upcountry KSh 350. FREE for orders KSh 2000+.</p><h4>2. Payments</h4><p>All payments via M-Pesa STK Push. Order confirmed after receipt.</p><h4>3. Authenticity</h4><p>100% genuine Pwani products. Verify code.</p><h4>4. Returns</h4><p>Returns within 24hrs if unopened with receipt.</p><h4>5. Security</h4><p>Your data is protected. Failed logins blocked after 5 tries.</p><p style="margin-top:16px;font-size:11px;color:#94a3b8">v6.0 Secured • Made in Kenya 🇰🇪</p><button class="btn" style="margin-top:14px" onclick="show('cart')">Back to Cart</button></div></div>
+<div id="terms" class="page"><h3>Terms & Conditions</h3><div class="card" style="display:block;line-height:1.7;font-size:13px;padding:18px"><h4>1. Delivery</h4><p>CBD KSh 150, Westlands KSh 200, Upcountry KSh 350. FREE for orders KSh 2000+.</p><h4>2. Payments</h4><p>All payments via M-Pesa STK Push. Order confirmed after receipt.</p><h4>3. Authenticity</h4><p>100% genuine Pwani products. Verify code.</p><h4>4. Returns</h4><p>Returns within 24hrs if unopened with receipt.</p><p style="margin-top:16px;font-size:11px;color:#94a3b8">v6.1 • Made in Kenya 🇰🇪</p><button class="btn" style="margin-top:14px" onclick="show('cart')">Back to Cart</button></div></div>
 <div id="admin" class="page"><h3>Admin 🔒</h3><div class="card" style="display:block"><input id="apass" type="password" placeholder="Admin Password"><button class="btn" onclick="adminLogin()">Secure Login</button><p id="ast"></p></div><div id="acont" style="display:none"><div id="alist"></div></div></div>
 <div id="receipt" class="page"><div class="card" style="display:block;text-align:center;padding:24px" id="rcont"></div><button class="btn" onclick="show('products')">Continue Shopping</button></div>
 <div class="bottom"><div id="b-products" class="active" onclick="show('products')">🏠<br>Home</div><div id="b-cart" onclick="show('cart')">🛒<br>Cart</div><div id="b-orders" onclick="show('orders')">📦<br>Orders</div><div id="b-account" onclick="show('account')">👤<br>Account</div></div>
@@ -227,10 +195,11 @@ function updateCount(){let c=0;for(let i of cart)c+=i.qty;let el=document.getEle
 function openMenu(){document.getElementById('side').classList.add('open');document.getElementById('overlay').classList.add('open');}
 function closeMenu(){document.getElementById('side').classList.remove('open');document.getElementById('overlay').classList.remove('open');}
 function filterCat(cat,el){activeCat=cat;document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');filterProducts();}
-function filterProducts(){let q=document.getElementById('searchInput').value.toLowerCase();let f=all.filter(p=>{let matchCat=activeCat==='All'||p.category===activeCat;let matchSearch=!q||p.name.toLowerCase().includes(q);return matchCat&&matchSearch;});render(f);}
-function render(list){let h='';for(let p of list){let inC=cart.find(c=>c.id===p.id);let low=p.stock<=8?`<span style="color:#ef4444;font-size:10px;font-weight:800;background:#fef2f2;padding:3px 8px;border-radius:20px;margin-left:6px">Only ${p.stock} left!</span>`:'';h+=`<div class="card"><img src="${p.image}" onerror="this.src='https://via.placeholder.com/200?text=No+Image'"><div style="flex:1"><div style="font-weight:700;font-size:13px;line-height:1.3">${p.name}${low}</div><div style="font-size:11px;color:#94a3b8;margin-top:4px">${p.category} • ${p.code}</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><b style="font-size:16px">KSh ${p.price}</b><button class="btn" style="width:auto;padding:8px 18px;border-radius:20px;font-size:12px" onclick="add(${p.id})">${inC?'✓ '+inC.qty:'Add'}</button></div></div></div>`;}document.getElementById('plist').innerHTML=h||'<div class="card" style="display:block;text-align:center">No products found</div>';document.getElementById('pCount').innerText=list.length+' items';}
+function filterProducts(){let q=document.getElementById('searchInput').value.toLowerCase();let sort=document.getElementById('sortSelect').value;let f=all.filter(p=>{let matchCat=activeCat==='All'||p.category===activeCat;let matchSearch=!q||p.name.toLowerCase().includes(q);return matchCat&&matchSearch;});if(sort==='low')f.sort((a,b)=>a.price-b.price);if(sort==='high')f.sort((a,b)=>b.price-a.price);if(sort==='name')f.sort((a,b)=>a.name.localeCompare(b.name));render(f);}
+function parseImg(s){let parts=(s||'🧼|#f1f5f9').split('|');return {emoji:parts[0],bg:parts[1]||'#f1f5f9'};}
+function render(list){let h='';for(let p of list){let inC=cart.find(c=>c.id===p.id);let low=p.stock<=8?`<span style="color:#ef4444;font-size:10px;font-weight:800;background:#fef2f2;padding:3px 8px;border-radius:20px;margin-left:6px">Only ${p.stock} left!</span>`:'';let im=parseImg(p.image);h+=`<div class="card"><div class="pimg" style="background:${im.bg}">${im.emoji}</div><div style="flex:1"><div style="font-weight:700;font-size:13px;line-height:1.3">${p.name}${low}</div><div style="font-size:11px;color:#94a3b8;margin-top:4px">${p.category} • ${p.code}</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><b style="font-size:16px">KSh ${p.price}</b><button class="btn" style="width:auto;padding:8px 18px;border-radius:20px;font-size:12px" onclick="add(${p.id})">${inC?'✓ '+inC.qty:'Add'}</button></div></div></div>`;}document.getElementById('plist').innerHTML=h||'<div class="card" style="display:block;text-align:center">No products found</div>';document.getElementById('pCount').innerText=list.length+' items';}
 function add(id){let p=all.find(x=>x.id===id);let f=cart.find(c=>c.id===id);if(f)f.qty++;else cart.push({id:p.id,name:p.name,price:p.price,image:p.image,qty:1});save();filterProducts();}
-function renderCart(){let cont=document.getElementById('cartItems'),sum=document.getElementById('cartSum'),empty=document.getElementById('emptyCart');if(cart.length===0){cont.innerHTML='';sum.style.display='none';empty.style.display='block';return;}empty.style.display='none';sum.style.display='block';let sub=0,items=0,html='';for(let it of cart){sub+=it.price*it.qty;items+=it.qty;html+=`<div class="card"><img src="${it.image}" style="width:60px;height:60px"><div style="flex:1"><b style="font-size:13px">${it.name}</b><div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button onclick="chg(${it.id},-1)" style="width:28px;height:28px;border-radius:50%;border:1px solid #e2e8f0;background:#fff">-</button><span>${it.qty}</span><button onclick="chg(${it.id},1)" style="width:28px;height:28px;border-radius:50%;border:1px solid #e2e8f0;background:#fff">+</button><span style="margin-left:auto;font-weight:800">KSh ${it.price*it.qty}</span></div></div></div>`;}cont.innerHTML=html;let area=document.getElementById('area').value;let del=area==='CBD'?150:area==='Upcountry'?350:200;if(sub>=2000)del=0;let tot=sub+del;document.getElementById('sub').innerText=sub;document.getElementById('tItems').innerText=items;document.getElementById('delFee').innerText=del==0?'FREE':'KSh '+del;document.getElementById('tot').innerText=tot;document.getElementById('pay').innerText=tot;}
+function renderCart(){let cont=document.getElementById('cartItems'),sum=document.getElementById('cartSum'),empty=document.getElementById('emptyCart');if(cart.length===0){cont.innerHTML='';sum.style.display='none';empty.style.display='block';return;}empty.style.display='none';sum.style.display='block';let sub=0,items=0,html='';for(let it of cart){sub+=it.price*it.qty;items+=it.qty;let im=parseImg(it.image);html+=`<div class="card"><div class="pimg" style="width:60px;height:60px;font-size:24px;background:${im.bg}">${im.emoji}</div><div style="flex:1"><b style="font-size:13px">${it.name}</b><div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button onclick="chg(${it.id},-1)" style="width:28px;height:28px;border-radius:50%;border:1px solid #e2e8f0;background:#fff">-</button><span>${it.qty}</span><button onclick="chg(${it.id},1)" style="width:28px;height:28px;border-radius:50%;border:1px solid #e2e8f0;background:#fff">+</button><span style="margin-left:auto;font-weight:800">KSh ${it.price*it.qty}</span></div></div></div>`;}cont.innerHTML=html;let area=document.getElementById('area').value;let del=area==='CBD'?150:area==='Upcountry'?350:200;if(sub>=2000)del=0;let tot=sub+del;document.getElementById('sub').innerText=sub;document.getElementById('tItems').innerText=items;document.getElementById('delFee').innerText=del==0?'FREE':'KSh '+del;document.getElementById('tot').innerText=tot;document.getElementById('pay').innerText=tot;}
 function chg(id,d){let f=cart.find(c=>c.id===id);if(!f)return;f.qty+=d;if(f.qty<=0)cart=cart.filter(c=>c.id!==id);save();renderCart();}
 function show(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.bottom div').forEach(b=>b.classList.remove('active'));let btn=document.getElementById('b-'+id);if(btn)btn.classList.add('active');if(id==='cart')renderCart();closeMenu();window.scrollTo(0,0);}
 async function loadP(){let r=await fetch('/api/products');all=await r.json();render(all);}
