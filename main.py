@@ -246,7 +246,7 @@ body.dark{--bg:#121212;--card:#1e1e1e;--text:#fff;--muted:#aaa}
 
 <div class="overlay" id="overlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="drawer">
-<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:20px">LONMA <span style="color:#FF4081">ORBIT</span></b><button onclick="closeDrawer()" style="background:none;border:none;color:#fff;font-size:22px">✕</button></div>
+<div style="display:flex;justify-content:space-between;align-items:center"><div style="display:flex;align-items:center;gap:8px"><img src="/logo.png" onerror="this.style.display='none'" style="width:38px;height:38px;border-radius:50%;object-fit:cover;background:#fff"><b style="font-size:20px">LONMA <span style="color:#FF4081">ORBIT</span></b></div><button onclick="closeDrawer()" style="background:none;border:none;color:#fff;font-size:22px">✕</button></div>
 <p style="font-size:12px;opacity:.6;margin-top:4px">Beauty • Hair • Skin • Kenya</p>
 <h3>SHOP</h3>
 <div class="menu-item" onclick="filterCat('All')"><span class="ico">🏠</span> Home</div>
