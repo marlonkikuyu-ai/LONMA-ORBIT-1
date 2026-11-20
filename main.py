@@ -225,7 +225,10 @@ body.dark{--bg:#121212;--card:#1e1e1e;--text:#fff;--muted:#aaa}
 .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:12px 18px;border-radius:999px;font-size:13px;display:none;z-index:300}
 .testbar{background:#F59E0B;color:#111;text-align:center;padding:8px;font-size:12px;font-weight:700}
 </style></head><body>
-<div class="topbar"><button class="hamburger" onclick="openDrawer()">☰</button><div class="logo">LONMA <span>ORBIT</span></div><button onclick="openCart()" style="background:none;border:none;color:#fff;font-size:22px">🛒 <span id="cartCountTop">0</span></button></div>
+<div class="topbar"><button class="hamburger" onclick="openDrawer()">☰</button><div class="logo" onclick="window.scrollTo(0,0)" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+  <img src="/logo.png" onerror="this.style.display='none'" style="width:38px;height:38px;border-radius:50%;object-fit:cover;background:#fff">
+  <span>LONMA <span style="color:#FF4081">ORBIT</span></span>
+</div><button onclick="openCart()" style="background:none;border:none;color:#fff;font-size:22px">🛒 <span id="cartCountTop">0</span></button></div>
 <div id="testBar"></div>
 <div class="banner"><h2>✨ Beauty Delivered in Nairobi</h2><p>Same-day delivery • Pay with M-Pesa • 100% Genuine</p><button class="btn" style="background:#fff;color:#E91E63" onclick="document.getElementById('grid').scrollIntoView()">Shop Now →</button></div>
 <div class="search"><input id="q" placeholder="Search oil, wig, serum..." oninput="render()"><button class="btn" onclick="render()">Search</button></div>
