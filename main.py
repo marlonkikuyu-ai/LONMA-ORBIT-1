@@ -8,10 +8,12 @@ from collections import defaultdict
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-DARAJA_KEY = os.getenv("DARAJA_KEY",""); DARAJA_SECRET=os.getenv("DARAJA_SECRET","")
-DARAJA_SHORTCODE=os.getenv("DARAJA_SHORTCODE","174379"); DARAJA_PASSKEY=os.getenv("DARAJA_PASSKEY","")
-DARAJA_CALLBACK=os.getenv("CALLBACK_URL","https://app.lonmaorbit.co.ke/mpesa/callback")
-USE_PROD=os.getenv("DARAJA_ENV","sandbox")=="production"
+DARAJA_KEY = os.getenv("DARAJA_KEY","") or os.getenv("MPESA_CONSUMER_KEY","")
+DARAJA_SECRET = os.getenv("DARAJA_SECRET","") or os.getenv("MPESA_CONSUMER_SECRET","")
+DARAJA_SHORTCODE = os.getenv("DARAJA_SHORTCODE","") or os.getenv("MPESA_SHORTCODE","174379")
+DARAJA_PASSKEY = os.getenv("DARAJA_PASSKEY","") or os.getenv("MPESA_PASSKEY","")
+DARAJA_CALLBACK = os.getenv("CALLBACK_URL","") or os.getenv("MPESA_CALLBACK_URL","https://app.lonmaorbit.co.ke/mpesa/callback")
+USE_PROD = os.getenv("DARAJA_ENV","sandbox")=="production"
 AIRTEL_KEY=os.getenv("AIRTEL_KEY",""); AIRTEL_SECRET=os.getenv("AIRTEL_SECRET","")
 STRIPE_KEY=os.getenv("STRIPE_KEY","")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD","Lonma#2026!Secure")
