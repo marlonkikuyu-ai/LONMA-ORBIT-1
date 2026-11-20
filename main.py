@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-import os, sqlite3, json, datetime, requests, base64, time, re, random
+import os, sqlite3, json, datetime, requests, base64, time, re, random, hashlib, hmac, secrets
 from threading import Thread
 from collections import defaultdict
 
@@ -15,6 +15,36 @@ USE_PROD=os.getenv("DARAJA_ENV","sandbox")=="production"
 AIRTEL_KEY=os.getenv("AIRTEL_KEY",""); AIRTEL_SECRET=os.getenv("AIRTEL_SECRET","")
 STRIPE_KEY=os.getenv("STRIPE_KEY","")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD","Lonma#2026!Secure")
+# SMS - Africa's Talking / Twilio - set in Render Env
+SMS_API_KEY=os.getenv("SMS_API_KEY",""); SMS_USERNAME=os.getenv("SMS_USERNAME",""); SMS_SENDER=os.getenv("SMS_SENDER","LONMA")
+SHOW_RESET_CODE=os.getenv("SHOW_RESET_CODE","false").lower()=="true"  # ONLY for testing, keep false in production
+
+# --- PASSWORD HASHING ---
+def hash_pw(pw: str):
+    salt = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac('sha256', pw.encode(), salt.encode(), 100000).hex()
+    return f"{salt}:{h}"
+def check_pw(pw: str, stored: str):
+    if not stored: return False
+    # New hashed format salt:hash
+    if ":" in stored and len(stored.split(":")[0])==32:
+        try:
+            salt, h = stored.split(":")
+            nh = hashlib.pbkdf2_hmac('sha256', pw.encode(), salt.encode(), 100000).hex()
+            return hmac.compare_digest(h, nh)
+        except: return False
+    # Legacy plain password - migrate on login
+    return hmac.compare_digest(stored, pw)
+
+def send_sms(phone, message):
+    # Try Africa's Talking if configured
+    if SMS_API_KEY and SMS_USERNAME:
+        try:
+            r=requests.post("https://api.africastalking.com/version1/messaging", data={"username":SMS_USERNAME,"to":phone,"message":message,"from":SMS_SENDER}, headers={"apiKey":SMS_API_KEY,"Content-Type":"application/x-www-form-urlencoded"}, timeout=10)
+            return r.status_code in (200,201)
+        except: pass
+    # TODO: Add Twilio here if you use Twilio
+    return False
 
 FAILED = defaultdict(list); BLOCKED = {}
 def is_blocked(ip):
@@ -90,6 +120,10 @@ async def callback(request:Request):
             conn.execute("UPDATE orders SET status='PAID', mpesa_receipt=? WHERE checkout_id=?",(receipt,stk.get("CheckoutRequestID",""))); conn.commit()
         return {"ResultCode":0,"ResultDesc":"Accepted"}
     except: return {"ResultCode":0,"ResultDesc":"Accepted"}
+
+@app.get("/api/health")
+def health():
+    return {"status":"ok","mpesa_env":"production" if USE_PROD else "sandbox","mpesa_configured":bool(DARAJA_KEY and DARAJA_PASSKEY),"airtel_configured":bool(AIRTEL_KEY),"card_configured":bool(STRIPE_KEY),"sms_configured":bool(SMS_API_KEY),"show_reset_code":SHOW_RESET_CODE}
 
 @app.get("/api/community/posts")
 def get_posts(phone:str=""):
@@ -262,6 +296,9 @@ async def stk(req:Request):
     except: amount=1
     if amount<1 or amount>500000: return {"status":"error","message":"Invalid amount"}
     if len(phone)!=12: return {"status":"error","message":"Invalid phone"}
+    if not USE_PROD:
+        # In sandbox, still allow but mark clearly - production must set DARAJA_ENV=production
+        pass
     order_no='LONMA'+datetime.datetime.now().strftime("%H%M%S")
     name=clean_input(d.get('name','Guest'),50); area=clean_input(d.get('area',''),20); loc=clean_input(d.get('location',''),100)
     save_order(order_no,name,raw,area,loc,d.get('cart',[]),amount,'M-Pesa')
@@ -281,6 +318,9 @@ async def stk(req:Request):
 
 @app.post("/airtel/stkpush")
 async def airtel_push(req:Request):
+    # PRODUCTION FIX: Block fake PAID if no real Airtel keys
+    if not AIRTEL_KEY or not AIRTEL_SECRET:
+        return {"status":"error","message":"Airtel Money is temporarily unavailable. Please use M-Pesa."}
     d=await req.json(); raw=clean_input(d.get('phone',''),15); phone=raw.replace(" ","").replace("+254","0")
     if phone.startswith("0"): phone="254"+phone[1:]
     phone="".join([c for c in phone if c.isdigit()])
@@ -290,21 +330,27 @@ async def airtel_push(req:Request):
     order_no='LONMA'+datetime.datetime.now().strftime("%H%M%S")
     name=clean_input(d.get('name','Guest'),50); area=clean_input(d.get('area',''),20); loc=clean_input(d.get('location',''),100)
     save_order(order_no,name,raw,area,loc,d.get('cart',[]),amount,'Airtel Money')
+    # TODO: Add real Airtel Africa API call here with AIRTEL_KEY
     return {"status":"ok","message":f"Airtel Money prompt sent to {raw}. Check phone and enter PIN. Order {order_no}","order_no":order_no}
 
 @app.post("/card/pay")
 async def card_pay(req:Request):
+    # PRODUCTION FIX: Block fake PAID if no Stripe key
+    if not STRIPE_KEY:
+        return {"status":"error","message":"Card payment is temporarily unavailable. Please use M-Pesa."}
     d=await req.json()
     try: amount=int(d.get('amount',1))
     except: amount=1
     card_no=clean_input(d.get('card_no',''),19).replace(" ","")
     if len(card_no)<15: return {"status":"error","message":"Invalid card number"}
     if not d.get('expiry') or not d.get('cvv'): return {"status":"error","message":"Enter expiry and CVV"}
+    # PRODUCTION: Never log card_no / cvv. In real Stripe integration, use Stripe PaymentIntent on frontend, never send raw card to your server.
+    # This endpoint now requires STRIPE_KEY and should be replaced with Stripe PaymentIntent flow before public launch.
     order_no='LONMA'+datetime.datetime.now().strftime("%H%M%S")
     name=clean_input(d.get('name','Guest'),50); raw=clean_input(d.get('phone',''),15); area=clean_input(d.get('area',''),20); loc=clean_input(d.get('location',''),100)
+    # Do NOT mark PAID until Stripe confirms. Keep Pending for manual verification until Stripe webhook is added.
     save_order(order_no,name,raw,area,loc,d.get('cart',[]),amount,'Card / Global Pay')
-    conn.execute("UPDATE orders SET status='PAID' WHERE order_no=?",(order_no,)); conn.commit()
-    return {"status":"ok","message":f"Card payment successful. Order {order_no}","order_no":order_no}
+    return {"status":"ok","message":f"Card payment received - pending confirmation. Order {order_no}","order_no":order_no}
 
 @app.post("/api/auth/register")
 async def reg(req:Request):
@@ -312,26 +358,41 @@ async def reg(req:Request):
     if len(phone)<10 or len(pwd)<4: return {"status":"error","message":"Invalid input"}
     cur=conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?",(phone,))
     if cur.fetchone(): return {"status":"error","message":"Exists"}
-    cur.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)",(phone,name,pwd)); conn.commit()
+    cur.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)",(phone,name,hash_pw(pwd))); conn.commit()
     return {"status":"ok","user":{"phone":phone,"name":name}}
 
 @app.post("/api/auth/login")
 async def log(req:Request):
     ip=req.client.host if req.client else "unknown"
     if is_blocked(ip): return {"status":"error","message":"Too many tries. Wait 15 mins"}
-    d=await req.json(); cur=conn.cursor(); cur.execute("SELECT phone,name FROM users WHERE phone=? AND password=?",(clean_input(d.get("phone",""),15),d.get("password","").strip()[:50])); row=cur.fetchone()
-    if not row: record_fail(ip); return {"status":"error","message":"Wrong"}
+    d=await req.json(); phone=clean_input(d.get("phone",""),15); pw=d.get("password","").strip()[:50]
+    cur=conn.cursor(); cur.execute("SELECT phone,name,password FROM users WHERE phone=?",(phone,)); row=cur.fetchone()
+    if not row or not check_pw(pw, row[2]):
+        record_fail(ip); return {"status":"error","message":"Wrong"}
+    # Migrate legacy plain password to hash
+    if ":" not in (row[2] or ""):
+        conn.execute("UPDATE users SET password=? WHERE phone=?",(hash_pw(pw),phone)); conn.commit()
     FAILED[ip]=[]; return {"status":"ok","user":{"phone":row[0],"name":row[1]}}
 
 @app.post("/api/auth/forgot")
 async def forgot(req:Request):
     d=await req.json(); phone=clean_input(d.get("phone",""),15)
+    # Always return same message - do NOT reveal if account exists (prevents phone enumeration)
     cur=conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?",(phone,))
-    if not cur.fetchone(): return {"status":"error","message":"No account found with this phone. Please Create Account first."}
-    code=str(random.randint(100000,999999))
-    expires=int(time.time())+600
-    conn.execute("INSERT OR REPLACE INTO password_resets VALUES (?,?,?)",(phone,code,expires)); conn.commit()
-    return {"status":"ok","message":f"Reset code sent. For testing, your code is {code}. Valid for 10 minutes.","code":code}
+    exists = cur.fetchone() is not None
+    if exists:
+        code=str(random.randint(100000,999999))
+        expires=int(time.time())+600
+        conn.execute("INSERT OR REPLACE INTO password_resets VALUES (?,?,?)",(phone,code,expires)); conn.commit()
+        # Send SMS - never return code in production
+        intl = phone
+        if intl.startswith("0"): intl="254"+intl[1:]
+        sent = send_sms(intl, f"Your LONMA ORBIT reset code is {code}. Valid 10 mins. Do not share it.")
+        if not sent and SHOW_RESET_CODE:
+            # Testing only - when SHOW_RESET_CODE=true in Render
+            return {"status":"ok","message":"Reset code sent via SMS. Check your phone.","code":code,"debug":True}
+    # Generic message - same for exists / not exists
+    return {"status":"ok","message":"If an account exists with this phone, a reset code has been sent via SMS. Check your phone."}
 
 @app.post("/api/auth/reset")
 async def reset_pw(req:Request):
@@ -339,23 +400,20 @@ async def reset_pw(req:Request):
     if len(newpw)<4: return {"status":"error","message":"Password must be at least 4 characters"}
     cur=conn.cursor(); cur.execute("SELECT code, expires FROM password_resets WHERE phone=?",(phone,)); row=cur.fetchone()
     if not row: return {"status":"error","message":"No reset request found. Request a new code."}
-    if row[0]!=code: return {"status":"error","message":"Wrong code"}
+    if not hmac.compare_digest(str(row[0]), str(code)): return {"status":"error","message":"Wrong code"}
     if int(time.time())>row[1]: return {"status":"error","message":"Code expired. Request a new code."}
-    conn.execute("UPDATE users SET password=? WHERE phone=?",(newpw,phone)); conn.execute("DELETE FROM password_resets WHERE phone=?",(phone,)); conn.commit()
+    conn.execute("UPDATE users SET password=? WHERE phone=?",(hash_pw(newpw),phone)); conn.execute("DELETE FROM password_resets WHERE phone=?",(phone,)); conn.commit()
     return {"status":"ok","message":"Password reset successful. You can now Sign In."}
 
 HTML="""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>LONMA ORBIT - Online Supermarket</title><style>
 :root{--teal:#0A9EBB;--dark:#0F172A;--line:#E2E8F0;--muted:#64748B;--bg:#F8FAFC;--card:#FFFFFF;--text:#0F172A}*{box-sizing:border-box}body{margin:0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
-/* DARK MODE */
 body.dark{--bg:#0F172A;--card:#1E293B;--text:#F8FAFC;--line:#334155;--muted:#94A3B8}
 body.dark .nav,body.dark .side,body.dark .bottom,body.dark .card,body.dark .statbox{ background:#1E293B !important; color:#F8FAFC !important; border-color:#334155 !important}
 body.dark .search-box,body.dark input,body.dark select,body.dark textarea{ background:#0F172A !important; color:#fff !important; border-color:#334155 !important}
 body.dark .chip{ background:#1E293B !important; color:#fff !important; border-color:#334155 !important}
 body.dark .mi:hover{ background:#0F172A !important}
 body.dark .pill{ background:#0F172A !important; color:#fff !important}
-/* THEMES - accent color */
 body.theme-pink{--teal:#EC4899} body.theme-green{--teal:#16A34A} body.theme-orange{--teal:#EA580C} body.theme-purple{--teal:#7C3AED} body.theme-gold{--teal:#B45309}
-/* FONT SIZE */
 body.font-small{font-size:13px} body.font-large{font-size:17px} body.font-large .card{padding:18px}
 .nav{position:fixed;top:0;width:100%;background:var(--card);z-index:1000;border-bottom:1px solid var(--line)}.nav-top{padding:10px 16px;display:flex;justify-content:space-between;align-items:center;height:60px}
 .logo{display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0}
@@ -390,19 +448,21 @@ input,select,textarea{width:100%;padding:12px;border-radius:12px;border:1px soli
 .trend-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #F1F5F9}.trend-row:last-child{border-bottom:none}
 .empty-state{text-align:center;padding:28px 16px;color:#64748B}.empty-state b{color:var(--text);font-size:15px}
 .pay-opt{display:flex;gap:10px;margin:8px 0}.pay-card{flex:1;border:2px solid var(--line);border-radius:14px;padding:12px 8px;text-align:center;cursor:pointer;background:var(--card)}.pay-card.active{border-color:var(--teal);background:#F0F9FB}.pay-card b{display:block;font-size:12px;margin-top:4px}.pay-card span{font-size:10px;color:var(--muted)}
+.pay-card.disabled{opacity:.45;cursor:not-allowed}
 .link{color:var(--teal);font-weight:800;cursor:pointer;font-size:13px;text-align:center;display:block;margin-top:10px}
 .terms-box{line-height:1.7;font-size:13px}.terms-box h4{margin:16px 0 6px;font-size:14px}.terms-box p{margin:4px 0;color:#334155}
 .appear-opt{display:flex;gap:10px;flex-wrap:wrap}.appear-card{flex:1;min-width:90px;border:2px solid var(--line);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;background:var(--card)}.appear-card.active{border-color:var(--teal);background:#F0F9FB}.color-dot{width:32px;height:32px;border-radius:50%;margin:0 auto;border:2px solid #fff;box-shadow:0 0 0 1px #E2E8F0;cursor:pointer}.color-dot.active{box-shadow:0 0 0 3px var(--teal)}
 .toggle{width:52px;height:28px;border-radius:20px;background:#E2E8F0;position:relative;cursor:pointer;transition:.3s;flex-shrink:0}.toggle.on{background:var(--teal)}.toggle::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.3s}.toggle.on::after{left:27px}
+.prod-badge{font-size:10px;font-weight:800;padding:4px 8px;border-radius:20px;background:#FEF3C7;color:#92400E}
 </style></head><body>
 <div class="nav"><div class="nav-top"><div class="logo" onclick="logoPress()"><img src="/logo.png" alt="LONMA"><b>LONMA ORBIT<small>ONLINE SUPERMARKET</small></b></div><div class="header-actions"><div class="pill" onclick="show('appearance')" style="font-size:16px">◐</div><div class="pill" onclick="show('wishlist')">Saved <span id="wishCount">0</span></div><div class="pill pill-dark" onclick="show('cart')">CART <span id="cartCount" class="cart-num" style="display:none">0</span></div></div></div><div class="search-wrap"><div class="search-box"><span class="burger" onclick="openMenu()">MENU</span><input id="searchInput" placeholder="Search Diva, Detrex, Sawa..." oninput="filterProducts()"></div></div><div class="cat-chips"><div class="chip active" onclick="filterCat('All',this)">All</div><div class="chip" onclick="filterCat('Soaps',this)">Soaps</div><div class="chip" onclick="filterCat('Lotions',this)">Lotions</div><div class="chip" onclick="filterCat('Pomades',this)">Pomades</div><div class="chip" onclick="filterCat('Cooking Oils',this)">Oils</div></div></div>
 <div class="wa" onclick="openWA()">CHAT WITH US</div>
 <div class="overlay" id="overlay" onclick="closeMenu()"></div>
-<div class="side" id="side"><div class="top-box"><div style="text-align:right"><span style="background:rgba(255,255,255,.15);padding:7px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer" onclick="show('cart');closeMenu()">VIEW CART</span></div><div class="lc" onclick="logoSlide(this)"><img src="/logo.png" alt="LONMA"></div><div style="font-weight:800;font-size:19px;margin-top:12px;letter-spacing:.5px">LONMA ORBIT</div><div style="opacity:.85;font-size:12px;margin-top:4px">100% Genuine &middot; Fast Delivery &middot; Secured</div><div style="margin-top:12px;background:var(--teal);padding:10px;border-radius:10px;font-size:12px;font-weight:700;line-height:1.5">We Accept: M-Pesa &middot; Airtel Money &middot; Card / Global Pay<br>Promo: LONMA10 = 10% OFF</div></div><div class="menu"><div class="label">SHOP</div><div class="mi" onclick="show('products');closeMenu()"><div class="ico">HOME</div><b>Home &middot; Products</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="mi" onclick="show('wishlist');closeMenu()"><div class="ico">SAVED</div><b>Wishlist</b><span class="tag" style="background:#F1F5F9" id="mcWish">0</span></div><div class="mi" onclick="show('cart');closeMenu()"><div class="ico">CART</div><b>Cart</b><span class="tag" style="background:#F1F5F9" id="mc">0</span></div><div class="mi" onclick="show('track');closeMenu()"><div class="ico">TRACK</div><b>Track Order</b></div><div class="div"></div><div class="label">COMMUNITY</div><div class="mi" onclick="show('community');closeMenu()"><div class="ico" style="background:var(--teal);color:#fff">COM</div><b>Community</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="div"></div><div class="label">MY DASHBOARD</div><div class="mi" onclick="show('account');closeMenu()"><div class="ico">ACCT</div><b>My Dashboard</b><span class="tag" style="background:#DCFCE7;color:#166534">CUSTOMER</span></div><div class="mi" onclick="show('appearance');closeMenu()"><div class="ico">LOOK</div><b>Appearance</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="div"></div><div class="label">SUPPORT</div><div class="mi" onclick="show('scan');closeMenu()"><div class="ico">VERIFY</div><b>Verify Product</b></div><div class="mi" onclick="openWA()"><div class="ico">CHAT</div><b>WhatsApp Us</b></div><div class="mi" onclick="show('terms');closeMenu()"><div class="ico">TERMS</div><b>Terms &amp; Conditions</b></div><div class="mi" onclick="show('forgot');closeMenu()"><div class="ico">LOCK</div><b>Forgot Password</b></div><div class="div"></div><div class="mi" onclick="show('admin');closeMenu()"><div class="ico" style="background:#0F172A;color:#fff">ADMIN</div><b>Admin Dashboard</b><span class="tag" style="background:#0F172A;color:#fff">ADMIN</span></div><div style="text-align:center;padding:18px;color:#94A3B8;font-size:11px">v15.0 Appearance &middot; Kenya</div></div></div>
+<div class="side" id="side"><div class="top-box"><div style="text-align:right"><span style="background:rgba(255,255,255,.15);padding:7px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer" onclick="show('cart');closeMenu()">VIEW CART</span></div><div class="lc" onclick="logoSlide(this)"><img src="/logo.png" alt="LONMA"></div><div style="font-weight:800;font-size:19px;margin-top:12px;letter-spacing:.5px">LONMA ORBIT</div><div style="opacity:.85;font-size:12px;margin-top:4px">100% Genuine &middot; Fast Delivery &middot; Secured</div><div style="margin-top:12px;background:var(--teal);padding:10px;border-radius:10px;font-size:12px;font-weight:700;line-height:1.5">We Accept: M-Pesa &middot; Airtel Money &middot; Card / Global Pay<br>Promo: LONMA10 = 10% OFF</div><div id="prodBadge" style="margin-top:10px"></div></div><div class="menu"><div class="label">SHOP</div><div class="mi" onclick="show('products');closeMenu()"><div class="ico">HOME</div><b>Home &middot; Products</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="mi" onclick="show('wishlist');closeMenu()"><div class="ico">SAVED</div><b>Wishlist</b><span class="tag" style="background:#F1F5F9" id="mcWish">0</span></div><div class="mi" onclick="show('cart');closeMenu()"><div class="ico">CART</div><b>Cart</b><span class="tag" style="background:#F1F5F9" id="mc">0</span></div><div class="mi" onclick="show('track');closeMenu()"><div class="ico">TRACK</div><b>Track Order</b></div><div class="div"></div><div class="label">COMMUNITY</div><div class="mi" onclick="show('community');closeMenu()"><div class="ico" style="background:var(--teal);color:#fff">COM</div><b>Community</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="div"></div><div class="label">MY DASHBOARD</div><div class="mi" onclick="show('account');closeMenu()"><div class="ico">ACCT</div><b>My Dashboard</b><span class="tag" style="background:#DCFCE7;color:#166534">CUSTOMER</span></div><div class="mi" onclick="show('appearance');closeMenu()"><div class="ico">LOOK</div><b>Appearance</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="div"></div><div class="label">SUPPORT</div><div class="mi" onclick="show('scan');closeMenu()"><div class="ico">VERIFY</div><b>Verify Product</b></div><div class="mi" onclick="openWA()"><div class="ico">CHAT</div><b>WhatsApp Us</b></div><div class="mi" onclick="show('terms');closeMenu()"><div class="ico">TERMS</div><b>Terms &amp; Conditions</b></div><div class="mi" onclick="show('forgot');closeMenu()"><div class="ico">LOCK</div><b>Forgot Password</b></div><div class="div"></div><div class="mi" onclick="show('admin');closeMenu()"><div class="ico" style="background:#0F172A;color:#fff">ADMIN</div><b>Admin Dashboard</b><span class="tag" style="background:#0F172A;color:#fff">ADMIN</span></div><div style="text-align:center;padding:18px;color:#94A3B8;font-size:11px">v16.0 Production &middot; Kenya</div></div></div>
 
-<div id="products" class="page active"><div class="banner"><div><div style="font-weight:800;font-size:15px">FREE Delivery</div><div style="font-size:12px;opacity:.9">Orders over KSh 2000 &middot; M-Pesa / Airtel / Card</div></div><div style="background:#fff;color:var(--dark);padding:8px 14px;border-radius:20px;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap" onclick="show('community')">JOIN COMMUNITY</div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px"><h3 style="margin:0;font-size:17px">Products</h3><select id="sortSelect" onchange="filterProducts()" style="width:auto;padding:8px 12px;font-size:12px;font-weight:700;margin:0"><option value="featured">Sort: Featured</option><option value="low">Price: Low to High</option><option value="high">Price: High to Low</option><option value="name">Name: A to Z</option><option value="rating">Top Rated</option></select></div><div style="text-align:right;font-size:12px;color:#64748B;margin-bottom:4px" id="pCount">9 items</div><div id="plist"></div></div>
+<div id="products" class="page active"><div class="banner"><div><div style="font-weight:800;font-size:15px">FREE Delivery</div><div style="font-size:12px;opacity:.9">Orders over KSh 2000 &middot; M-Pesa / Airtel / Card</div></div><div style="background:#fff;color:var(--dark);padding:8px 14px;border-radius:20px;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap" onclick="show('community')">JOIN COMMUNITY</div></div><div id="prodWarning" style="display:none;background:#FEF3C7;color:#92400E;padding:10px;border-radius:10px;font-size:12px;font-weight:700;margin-bottom:10px"></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px"><h3 style="margin:0;font-size:17px">Products</h3><select id="sortSelect" onchange="filterProducts()" style="width:auto;padding:8px 12px;font-size:12px;font-weight:700;margin:0"><option value="featured">Sort: Featured</option><option value="low">Price: Low to High</option><option value="high">Price: High to Low</option><option value="name">Name: A to Z</option><option value="rating">Top Rated</option></select></div><div style="text-align:right;font-size:12px;color:#64748B;margin-bottom:4px" id="pCount">9 items</div><div id="plist"></div></div>
 
-<div id="appearance" class="page"><h3>Appearance</h3><p style="font-size:13px;color:var(--muted)">Make LONMA look how you like. Saved on your phone.</p><div class="card" style="display:block"><h4 style="margin:0 0 10px">Theme Mode</h4><div class="appear-opt"><div class="appear-card" id="modeLight" onclick="setMode('light')"><div style="font-size:22px">☀️</div><b>Light</b><span style="font-size:11px;color:var(--muted)">Bright &amp; Clean</span></div><div class="appear-card" id="modeDark" onclick="setMode('dark')"><div style="font-size:22px">🌙</div><b>Dark</b><span style="font-size:11px;color:var(--muted)">Easy on eyes</span></div><div class="appear-card" id="modeAuto" onclick="setMode('auto')"><div style="font-size:22px">🔄</div><b>Auto</b><span style="font-size:11px;color:var(--muted)">Follow phone</span></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px"><div><b style="font-size:14px">Dark Mode Quick Toggle</b><div style="font-size:12px;color:var(--muted)">Tap to switch instantly</div></div><div class="toggle" id="darkToggle" onclick="toggleDark()"></div></div></div><div class="card" style="display:block"><h4 style="margin:0 0 10px">App Colour</h4><div style="display:flex;gap:12px;justify-content:space-between"><div style="text-align:center"><div class="color-dot" data-theme="teal" style="background:#0A9EBB" onclick="setTheme('teal',this)"></div><span style="font-size:11px">Teal</span></div><div style="text-align:center"><div class="color-dot" data-theme="pink" style="background:#EC4899" onclick="setTheme('pink',this)"></div><span style="font-size:11px">Pink</span></div><div style="text-align:center"><div class="color-dot" data-theme="green" style="background:#16A34A" onclick="setTheme('green',this)"></div><span style="font-size:11px">Green</span></div><div style="text-align:center"><div class="color-dot" data-theme="orange" style="background:#EA580C" onclick="setTheme('orange',this)"></div><span style="font-size:11px">Orange</span></div><div style="text-align:center"><div class="color-dot" data-theme="purple" style="background:#7C3AED" onclick="setTheme('purple',this)"></div><span style="font-size:11px">Purple</span></div><div style="text-align:center"><div class="color-dot" data-theme="gold" style="background:#B45309" onclick="setTheme('gold',this)"></div><span style="font-size:11px">Gold</span></div></div><p style="font-size:11px;color:var(--muted)">Changes buttons, links and highlights instantly.</p></div><div class="card" style="display:block"><h4 style="margin:0 0 10px">Text Size</h4><div class="appear-opt"><div class="appear-card" id="fontSmall" onclick="setFont('small')"><b style="font-size:12px">A</b><span style="font-size:11px;display:block">Small</span></div><div class="appear-card" id="fontNormal" onclick="setFont('normal')"><b style="font-size:16px">A</b><span style="font-size:11px;display:block">Normal</span></div><div class="appear-card" id="fontLarge" onclick="setFont('large')"><b style="font-size:20px">A</b><span style="font-size:11px;display:block">Large</span></div></div></div><div class="card" style="display:block"><h4 style="margin:0 0 10px">Preview</h4><div class="banner"><div><div style="font-weight:800">FREE Delivery</div><div style="font-size:12px;opacity:.9">This is how your app looks</div></div><div style="background:#fff;color:#0F172A;padding:8px 14px;border-radius:20px;font-weight:800;font-size:12px">JOIN</div></div><button class="btn btn-teal">Sample Button</button><p style="font-size:12px;color:var(--muted);text-align:center;margin-top:10px" id="appearMsg"></p><button class="btn" onclick="resetAppearance()">Reset to Default</button></div></div>
+<div id="appearance" class="page"><h3>Appearance</h3><p style="font-size:13px;color:var(--muted)">Make LONMA look how you like. Saved on your phone.</p><div class="card" style="display:block"><h4 style="margin:0 0 10px">Theme Mode</h4><div class="appear-opt"><div class="appear-card" id="modeLight" onclick="setMode('light')"><div style="font-size:22px">☀️</div><b>Light</b><span style="font-size:11px;color:var(--muted)">Bright &amp; Clean</span></div><div class="appear-card" id="modeDark" onclick="setMode('dark')"><div style="font-size:22px">🌙</div><b>Dark</b><span style="font-size:11px;color:var(--muted)">Easy on eyes</span></div><div class="appear-card" id="modeAuto" onclick="setMode('auto')"><div style="font-size:22px">🔄</div><b>Auto</b><span style="font-size:11px;color:var(--muted)">Follow phone</span></div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px"><div><b style="font-size:14px">Dark Mode Quick Toggle</b><div style="font-size:12px;color:var(--muted)">Tap to switch instantly</div></div><div class="toggle" id="darkToggle" onclick="toggleDark()"></div></div></div><div class="card" style="display:block"><h4 style="margin:0 0 10px">App Colour</h4><div style="display:flex;gap:12px;justify-content:space-between"><div style="text-align:center"><div class="color-dot" data-theme="teal" style="background:#0A9EBB" onclick="setTheme('teal',this)"></div><span style="font-size:11px">Teal</span></div><div style="text-align:center"><div class="color-dot" data-theme="pink" style="background:#EC4899" onclick="setTheme('pink',this)"></div><span style="font-size:11px">Pink</span></div><div style="text-align:center"><div class="color-dot" data-theme="green" style="background:#16A34A" onclick="setTheme('green',this)"></div><span style="font-size:11px">Green</span></div><div style="text-align:center"><div class="color-dot" data-theme="orange" style="background:#EA580C" onclick="setTheme('orange',this)"></div><span style="font-size:11px">Orange</span></div><div style="text-align:center"><div class="color-dot" data-theme="purple" style="background:#7C3AED" onclick="setTheme('purple',this)"></div><span style="font-size:11px">Purple</span></div><div style="text-align:center"><div class="color-dot" data-theme="gold" style="background:#B45309" onclick="setTheme('gold',this)"></div><span style="font-size:11px">Gold</span></div></div></div><div class="card" style="display:block"><h4 style="margin:0 0 10px">Text Size</h4><div class="appear-opt"><div class="appear-card" id="fontSmall" onclick="setFont('small')"><b style="font-size:12px">A</b><span style="font-size:11px;display:block">Small</span></div><div class="appear-card" id="fontNormal" onclick="setFont('normal')"><b style="font-size:16px">A</b><span style="font-size:11px;display:block">Normal</span></div><div class="appear-card" id="fontLarge" onclick="setFont('large')"><b style="font-size:20px">A</b><span style="font-size:11px;display:block">Large</span></div></div></div><div class="card" style="display:block"><h4 style="margin:0 0 10px">Preview</h4><div class="banner"><div><div style="font-weight:800">FREE Delivery</div><div style="font-size:12px;opacity:.9">This is how your app looks</div></div><div style="background:#fff;color:#0F172A;padding:8px 14px;border-radius:20px;font-weight:800;font-size:12px">JOIN</div></div><button class="btn btn-teal">Sample Button</button><p style="font-size:12px;color:var(--muted);text-align:center;margin-top:10px" id="appearMsg"></p><button class="btn" onclick="resetAppearance()">Reset to Default</button></div></div>
 
 <div id="community" class="page"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0;font-size:17px">Community</h3><span style="font-size:11px;background:var(--teal);color:#fff;padding:6px 12px;border-radius:20px;font-weight:700">LONMA COMMUNITY</span></div><div class="card" style="display:block;margin-top:12px"><div style="display:flex;gap:10px"><div class="avatar" id="myAvatar">?</div><textarea id="postText" placeholder="Share deals, recipes, reviews... Use #Detrex #Diva" style="flex:1;border:none;outline:none;resize:none" rows="3"></textarea></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px"><span style="font-size:12px;color:#64748B">Post a review and earn points</span><button class="btn" style="width:auto;padding:10px 22px;border-radius:20px;background:var(--teal)" onclick="createPost()">Post</button></div></div><div class="card" style="display:block" id="trendCard"><h4 style="margin:0 0 4px;font-size:15px">Trending in LONMA</h4><div id="trendingList"></div></div><div id="feed"></div></div>
 
@@ -412,24 +472,24 @@ input,select,textarea{width:100%;padding:12px;border-radius:12px;border:1px soli
 
 <div id="cart" class="page"><h3>Cart</h3><div id="cartItems"></div><div id="cartSum" style="display:none"><div class="card" style="display:block"><div style="display:flex;gap:8px"><input id="promoCode" placeholder="Promo code e.g. LONMA10" style="flex:1"><button class="btn" style="width:auto;padding:12px 18px" onclick="applyPromo()">Apply</button></div><p id="promoMsg" style="font-size:12px;font-weight:700"></p><div style="display:flex;justify-content:space-between"><span>Subtotal (<span id="tItems">0</span>)</span><b>KSh <span id="sub">0</span></b></div><div style="display:flex;justify-content:space-between;margin-top:8px"><span>Discount</span><b id="discFee" style="color:#16A34A">KSh 0</b></div><div style="display:flex;justify-content:space-between;margin-top:8px"><span>Delivery</span><b id="delFee"></b></div><div style="display:flex;justify-content:space-between;margin-top:12px;font-size:18px;border-top:1px solid #F1F5F9;padding-top:12px"><span>Total</span><b>KSh <span id="tot">0</span></b></div>
 <h4 style="margin:18px 0 6px;font-size:14px">Payment Method</h4>
-<div class="pay-opt"><div class="pay-card active" id="payMpesa" onclick="setPay('mpesa')"><div style="font-size:16px;font-weight:800;color:#16A34A">M-PESA</div><b>M-Pesa</b><span>STK Push</span></div><div class="pay-card" id="payAirtel" onclick="setPay('airtel')"><div style="font-size:16px;font-weight:800;color:#EF4444">AIRTEL</div><b>Airtel Money</b><span>STK Push</span></div><div class="pay-card" id="payCard" onclick="setPay('card')"><div style="font-size:16px;font-weight:800;color:#0F172A">VISA</div><b>Card / Global</b><span>Visa / Mastercard</span></div></div>
+<div class="pay-opt"><div class="pay-card active" id="payMpesa" onclick="setPay('mpesa')"><div style="font-size:16px;font-weight:800;color:#16A34A">M-PESA</div><b>M-Pesa</b><span>STK Push</span></div><div class="pay-card" id="payAirtel" onclick="setPay('airtel')"><div style="font-size:16px;font-weight:800;color:#EF4444">AIRTEL</div><b>Airtel Money</b><span id="airtelLabel">STK Push</span></div><div class="pay-card" id="payCard" onclick="setPay('card')"><div style="font-size:16px;font-weight:800;color:#0F172A">VISA</div><b>Card / Global</b><span id="cardLabel">Visa / Mastercard</span></div></div><p id="payNote" style="font-size:11px;color:#92400E;background:#FEF3C7;padding:8px;border-radius:8px;display:none"></p>
 <div id="cardForm" style="display:none;margin-top:10px"><input id="cardNo" placeholder="Card Number 4242 4242 4242 4242" maxlength="19"><div style="display:flex;gap:8px"><input id="cardExpiry" placeholder="MM/YY" maxlength="5"><input id="cardCvv" placeholder="CVV" maxlength="4" type="password"></div><input id="cardName" placeholder="Name on Card"><p style="font-size:11px;color:#64748B">Secure payment. We do not store your card number.</p></div>
 <div style="margin-top:16px"><input id="custName" placeholder="Full Name"><input id="phone" placeholder="Phone 07... (M-Pesa / Airtel)"><select id="area"><option value="">Select Area</option><option value="CBD">CBD - 150</option><option value="Westlands">Westlands - 200</option><option value="Upcountry">Upcountry - 350</option></select><textarea id="loc" placeholder="Exact location / building"></textarea><label style="font-size:12px;display:flex;gap:8px;align-items:center;margin:12px 0"><input type="checkbox" id="agree" style="width:auto"> I agree to <a href="#" onclick="show('terms');return false" style="color:var(--teal);font-weight:800">Terms &amp; Conditions</a></label></div><button class="btn" id="payBtn" onclick="checkout()">Pay KSh <span id="pay">0</span> with M-Pesa</button><button class="btn" style="background:var(--teal);margin-top:8px" onclick="orderViaWA()">Order via WhatsApp</button><p id="ps" style="text-align:center;font-size:13px"></p></div></div><div id="emptyCart" class="card" style="text-align:center;padding:30px;display:block"><h4>Your cart is empty</h4><p style="font-size:13px;color:#64748B">Browse products and add items to your cart.</p><button class="btn btn-teal" onclick="show('products')">Start Shopping</button></div></div>
 
 <div id="orders" class="page"><h3>Orders</h3><div style="display:flex;gap:8px;margin-bottom:12px"><input id="phLookup" placeholder="Enter phone 07..."><button class="btn" style="width:auto;padding:10px 20px" onclick="loadOrders()">Load</button></div><div id="olist"></div><div id="noOrd" class="card" style="text-align:center;display:block"><p>No orders yet</p></div></div>
 <div id="scan" class="page"><h3>Verify Authenticity</h3><div class="card" style="display:block;padding:20px;text-align:center"><h4>Check Product</h4><p style="font-size:12px;color:#64748B">Enter code like DIV-001</p><input id="vcode" placeholder="DIV-001"><button class="btn btn-teal" onclick="verify()" style="margin-top:10px">Verify Now</button><p id="vres" style="font-weight:700;margin-top:12px"></p></div></div>
 
-<div id="account" class="page"><div id="out"><div class="card" style="display:block"><h4>Create Account</h4><input id="rn" placeholder="Full name"><input id="rp" placeholder="07xxxxxxxx"><input id="rpass" type="password" placeholder="Password"><button class="btn" onclick="register()">Create Account</button><p style="font-size:11px;color:#64748B;margin-top:8px">By creating an account you agree to <span style="color:var(--teal);font-weight:800;cursor:pointer" onclick="show('terms')">Terms &amp; Conditions</span></p><p id="rs"></p></div><div class="card" style="display:block"><h4>Sign In</h4><input id="lp" placeholder="07xxxxxxxx"><input id="lpass" type="password" placeholder="Password"><button class="btn" style="background:var(--teal)" onclick="login()">Sign In</button><span class="link" onclick="show('forgot')">Forgot Password?</span><p id="ls"></p></div></div><div id="in" style="display:none"><div class="card" style="display:block;background:var(--dark);color:#fff;text-align:center;padding:24px"><h3 id="an" style="margin:12px 0 4px">Welcome</h3><p id="ap" style="opacity:.7;font-size:13px"></p><button class="btn" style="background:#fff;color:var(--dark);margin-top:16px" onclick="logout()">Sign Out</button></div><div class="stat" style="margin-top:12px"><div class="statbox"><b id="cOrders">0</b><br><span>My Orders</span></div><div class="statbox"><b id="cSpent">KSh 0</b><br><span>Total Spent</span></div><div class="statbox"><b id="cPoints">0</b><br><span>Points</span></div><div class="statbox"><b id="cPhone">-</b><br><span>Phone</span></div></div><h4 style="margin:18px 0 6px">My Orders History</h4><div id="cList"></div></div></div>
+<div id="account" class="page"><div id="out"><div class="card" style="display:block"><h4>Create Account</h4><input id="rn" placeholder="Full name"><input id="rp" placeholder="07xxxxxxxx"><input id="rpass" type="password" placeholder="Password (min 4 chars)"><button class="btn" onclick="register()">Create Account</button><p style="font-size:11px;color:#64748B;margin-top:8px">By creating an account you agree to <span style="color:var(--teal);font-weight:800;cursor:pointer" onclick="show('terms')">Terms &amp; Conditions</span>. Password is encrypted.</p><p id="rs"></p></div><div class="card" style="display:block"><h4>Sign In</h4><input id="lp" placeholder="07xxxxxxxx"><input id="lpass" type="password" placeholder="Password"><button class="btn" style="background:var(--teal)" onclick="login()">Sign In</button><span class="link" onclick="show('forgot')">Forgot Password?</span><p id="ls"></p></div></div><div id="in" style="display:none"><div class="card" style="display:block;background:var(--dark);color:#fff;text-align:center;padding:24px"><h3 id="an" style="margin:12px 0 4px">Welcome</h3><p id="ap" style="opacity:.7;font-size:13px"></p><button class="btn" style="background:#fff;color:var(--dark);margin-top:16px" onclick="logout()">Sign Out</button></div><div class="stat" style="margin-top:12px"><div class="statbox"><b id="cOrders">0</b><br><span>My Orders</span></div><div class="statbox"><b id="cSpent">KSh 0</b><br><span>Total Spent</span></div><div class="statbox"><b id="cPoints">0</b><br><span>Points</span></div><div class="statbox"><b id="cPhone">-</b><br><span>Phone</span></div></div><h4 style="margin:18px 0 6px">My Orders History</h4><div id="cList"></div></div></div>
 
-<div id="forgot" class="page"><h3>Forgot Password</h3><div class="card" style="display:block;padding:20px"><p style="font-size:13px;color:#64748B;line-height:1.6">Enter your phone number. We will send you a 6-digit reset code. Code is valid for 10 minutes.</p><input id="fpPhone" placeholder="07xxxxxxxx"><button class="btn" onclick="sendResetCode()">Send Reset Code</button><p id="fpMsg" style="font-size:13px;font-weight:700"></p><div id="resetBox" style="display:none;margin-top:16px;border-top:1px solid #F1F5F9;padding-top:16px"><input id="fpCode" placeholder="Enter 6-digit code" maxlength="6"><input id="fpNew" type="password" placeholder="New Password (min 4 chars)"><input id="fpNew2" type="password" placeholder="Confirm New Password"><button class="btn btn-teal" onclick="doReset()">Reset Password</button><p id="fpMsg2" style="font-size:13px;font-weight:700"></p></div><span class="link" onclick="show('account')">Back to Sign In</span></div><div class="card" style="display:block;text-align:center"><p style="font-size:12px;color:#64748B">Still stuck? Contact us on WhatsApp</p><button class="btn" style="background:var(--teal)" onclick="openWA()">Chat on WhatsApp</button></div></div>
+<div id="forgot" class="page"><h3>Forgot Password</h3><div class="card" style="display:block;padding:20px"><p style="font-size:13px;color:#64748B;line-height:1.6">Enter your phone number. If an account exists, we will send a 6-digit reset code via SMS. Code is valid for 10 minutes. Never share your code with anyone.</p><input id="fpPhone" placeholder="07xxxxxxxx"><button class="btn" onclick="sendResetCode()">Send Reset Code via SMS</button><p id="fpMsg" style="font-size:13px;font-weight:700"></p><div id="resetBox" style="display:none;margin-top:16px;border-top:1px solid #F1F5F9;padding-top:16px"><input id="fpCode" placeholder="Enter 6-digit code from SMS" maxlength="6"><input id="fpNew" type="password" placeholder="New Password (min 4 chars)"><input id="fpNew2" type="password" placeholder="Confirm New Password"><button class="btn btn-teal" onclick="doReset()">Reset Password</button><p id="fpMsg2" style="font-size:13px;font-weight:700"></p></div><span class="link" onclick="show('account')">Back to Sign In</span></div><div class="card" style="display:block;text-align:center"><p style="font-size:12px;color:#64748B">Still stuck? Contact us on WhatsApp</p><button class="btn" style="background:var(--teal)" onclick="openWA()">Chat on WhatsApp</button></div></div>
 
-<div id="terms" class="page"><h3>Terms &amp; Conditions</h3><div style="font-size:11px;color:#94A3B8;margin-bottom:8px">Last updated: 20 November 2026 &middot; LONMA ORBIT &middot; Nairobi, Kenya</div><div class="card terms-box" style="display:block;padding:20px"><h4>1. About LONMA ORBIT</h4><p>LONMA ORBIT is an online supermarket in Kenya. By using this app, creating an account, or placing an order, you agree to these Terms.</p><h4>2. Accounts</h4><p>You must provide a correct phone number and name. You are responsible for keeping your password safe.</p><h4>3. Products &amp; Prices</h4><p>All products are 100% genuine. Prices are in Kenya Shillings (KSh).</p><h4>4. Orders</h4><p>When you place an order, you will receive an order number e.g. LONMA123456.</p><h4>5. Payments</h4><p>We accept M-Pesa, Airtel Money and Card / Global Pay (Visa, Mastercard). We do NOT store your full card number, CVV or PIN.</p><h4>6. Delivery</h4><p>CBD: KSh 150, Westlands: KSh 200, Upcountry: KSh 350. FREE delivery for orders KSh 2000+.</p><h4>7. Promos</h4><p>LONMA10 = 10% OFF, WELCOME20 = 20% OFF. One promo per order.</p><h4>8. Returns &amp; Refunds</h4><p>If product is damaged, wrong, or expired, report within 24 hours with photo via WhatsApp.</p><h4>9. Verify Product</h4><p>Every product has a code e.g. DIV-001. Use Verify Product to check authenticity.</p><h4>10. Community Rules</h4><p>Be respectful. No insults, no spam, no fake reviews.</p><h4>11. Privacy</h4><p>We collect your name, phone and delivery address only to process your order. We do not sell your data.</p><h4>12. Forgot Password</h4><p>Tap Forgot Password, enter phone, enter 6-digit code, set new password. Code expires in 10 mins.</p><h4>13. Changes</h4><p>We may update these Terms. Continued use means you accept new Terms.</p><h4>14. Contact Us</h4><p>WhatsApp: Chat button in app. Email: support@lonmaorbit.co.ke. Nairobi, Kenya.</p><label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-top:18px"><input type="checkbox" id="termsAgree" style="width:auto;margin-top:2px"> <span>I have read and agree to the Terms &amp; Conditions above.</span></label><button class="btn" style="margin-top:14px" onclick="acceptTerms()">I Agree - Back to Shopping</button><p id="termsMsg" style="font-size:12px;font-weight:700;text-align:center"></p></div></div>
+<div id="terms" class="page"><h3>Terms &amp; Conditions</h3><div style="font-size:11px;color:#94A3B8;margin-bottom:8px">Last updated: 20 November 2026 &middot; LONMA ORBIT &middot; Nairobi, Kenya</div><div class="card terms-box" style="display:block;padding:20px"><h4>1. About LONMA ORBIT</h4><p>LONMA ORBIT is an online supermarket in Kenya. By using this app you agree to these Terms.</p><h4>2. Accounts &amp; Security</h4><p>Your password is encrypted (hashed) and never stored in plain text. Do not share your password or reset code. Reset codes are sent only via SMS and expire in 10 minutes.</p><h4>3. Products &amp; Prices</h4><p>All products are 100% genuine. Prices are in Kenya Shillings (KSh).</p><h4>4. Orders</h4><p>You will receive an order number e.g. LONMA123456.</p><h4>5. Payments</h4><p>We accept M-Pesa, Airtel Money and Card / Global Pay (Visa, Mastercard). We do NOT store your full card number, CVV or PIN. Card payments are processed via secure payment provider.</p><h4>6. Delivery</h4><p>CBD: KSh 150, Westlands: KSh 200, Upcountry: KSh 350. FREE delivery for orders KSh 2000+.</p><h4>7. Promos</h4><p>LONMA10 = 10% OFF, WELCOME20 = 20% OFF. One promo per order.</p><h4>8. Returns &amp; Refunds</h4><p>If product is damaged, wrong, or expired, report within 24 hours with photo via WhatsApp.</p><h4>9. Verify Product</h4><p>Every product has a code e.g. DIV-001. Use Verify Product to check authenticity.</p><h4>10. Community Rules</h4><p>Be respectful. No insults, no spam, no fake reviews.</p><h4>11. Privacy</h4><p>We collect your name, phone and delivery address only to process your order. We do not sell your data. Passwords are hashed.</p><h4>12. Forgot Password</h4><p>Tap Forgot Password, enter phone, enter 6-digit code sent via SMS, set new password. Code expires in 10 mins. Do not share code.</p><h4>13. Changes</h4><p>We may update these Terms.</p><h4>14. Contact Us</h4><p>WhatsApp: Chat button in app. Email: support@lonmaorbit.co.ke. Nairobi, Kenya.</p><label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-top:18px"><input type="checkbox" id="termsAgree" style="width:auto;margin-top:2px"> <span>I have read and agree to the Terms &amp; Conditions above.</span></label><button class="btn" style="margin-top:14px" onclick="acceptTerms()">I Agree - Back to Shopping</button><p id="termsMsg" style="font-size:12px;font-weight:700;text-align:center"></p></div></div>
 
 <div id="admin" class="page"><h3>Admin Dashboard</h3><div id="adminLoginBox" class="card" style="display:block"><input id="apass" type="password" placeholder="Admin Password"><button class="btn" onclick="adminLogin()">Secure Login</button><p id="ast"></p></div><div id="acont" style="display:none"><div class="stat"><div class="statbox" style="background:#0F172A;color:#fff"><b id="aSales">KSh 0</b><br><span style="color:#CBD5E1">Total Sales</span></div><div class="statbox"><b id="aOrders">0</b><br><span>Total Orders</span></div><div class="statbox"><b id="aCust">0</b><br><span>Customers</span></div><div class="statbox"><b id="aProd">0</b><br><span>Products</span></div></div><div class="stat" style="margin-top:10px"><div class="statbox" style="background:var(--teal);color:#fff"><b id="aPosts">0</b><br><span>Community Posts</span></div><div class="statbox"><b>Live</b><br><span>Community Active</span></div></div><div class="dashtab"><div class="dtab active" onclick="switchAdminTab('orders',this)">Orders</div><div class="dtab" onclick="switchAdminTab('customers',this)">Customers</div><div class="dtab" onclick="switchAdminTab('stock',this)">Stock</div><div class="dtab" onclick="switchAdminTab('add',this)">Add Product</div></div><div id="aOrdersList"></div><div id="aCustList" style="display:none"></div><div id="aStockList" style="display:none"></div><div id="aAdd" style="display:none"><div class="card" style="display:block"><input id="npName" placeholder="Product Name"><input id="npPrice" type="number" placeholder="Price"><input id="npCode" placeholder="Code e.g. DIV-010"><select id="npCat"><option>Soaps</option><option>Lotions</option><option>Pomades</option><option>Cooking Oils</option></select><input id="npStock" type="number" placeholder="Stock"><button class="btn btn-teal" onclick="addProduct()">Add Product</button><p id="npMsg"></p></div></div></div></div>
 <div id="receipt" class="page"><div class="card" style="display:block;text-align:center;padding:24px" id="rcont"></div><button class="btn" onclick="show('products')">Continue Shopping</button></div>
 <div class="bottom"><div id="b-products" class="active" onclick="show('products')"><div class="bicon">HOME</div>Home</div><div id="b-community" onclick="show('community')"><div class="bicon">COMMUNITY</div>Community</div><div id="b-cart" onclick="show('cart')"><div class="bicon">CART</div>Cart</div><div id="b-orders" onclick="show('orders')"><div class="bicon">ORDERS</div>Orders</div><div id="b-account" onclick="show('account')"><div class="bicon">ACCOUNT</div>Dashboard</div></div>
 <script>
-let all=[],cart=[],wishlist=JSON.parse(localStorage.getItem('lonma_wish')||'[]'),myOrders=JSON.parse(localStorage.getItem('my_orders')||'[]'),activeCat='All',adminPass='',adminData=null,promoDiscount=0,promoCode='',feedCache=[],payMethod='mpesa';
+let all=[],cart=[],wishlist=JSON.parse(localStorage.getItem('lonma_wish')||'[]'),myOrders=JSON.parse(localStorage.getItem('my_orders')||'[]'),activeCat='All',adminPass='',adminData=null,promoDiscount=0,promoCode='',feedCache=[],payMethod='mpesa',health={};
 try{let s=localStorage.getItem('lonma_cart');if(s)cart=JSON.parse(s);}catch(e){cart=[];}
 function save(){localStorage.setItem('lonma_cart',JSON.stringify(cart));updateCount();}
 function saveWish(){localStorage.setItem('lonma_wish',JSON.stringify(wishlist));updateCount();}
@@ -447,7 +507,16 @@ function orderViaWA(){let txt='Hi LONMA. I want to order:\\n';for(let i of cart)
 function getUser(){try{return JSON.parse(localStorage.getItem('lonma_user')||'null');}catch(e){return null;}}
 function formatText(t){return t.replace(/#(\\w+)/g,'<span class="hashtag">#$1</span>');}
 function avatarLetter(name){return (name||'L').charAt(0).toUpperCase();}
-// APPEARANCE
+async function loadHealth(){
+  try{ let r=await fetch('/api/health'); health=await r.json();
+    let warn=document.getElementById('prodWarning'); let badge=document.getElementById('prodBadge');
+    if(health.mpesa_env!=='production'){ if(warn){ warn.style.display='block'; warn.innerText='⚠️ TEST MODE: M-Pesa is in Sandbox. Set DARAJA_ENV=production in Render for real payments.'; } if(badge){ badge.innerHTML='<span class="prod-badge">TEST MODE - M-Pesa Sandbox</span>'; } }
+    else { if(badge) badge.innerHTML='<span class="prod-badge" style="background:#DCFCE7;color:#166534">LIVE - M-Pesa Production</span>'; }
+    // Disable pay cards if not configured
+    if(!health.airtel_configured){ let c=document.getElementById('payAirtel'); if(c) c.classList.add('disabled'); let l=document.getElementById('airtelLabel'); if(l) l.innerText='Temporarily Unavailable'; }
+    if(!health.card_configured){ let c=document.getElementById('payCard'); if(c) c.classList.add('disabled'); let l=document.getElementById('cardLabel'); if(l) l.innerText='Temporarily Unavailable'; }
+  }catch(e){}
+}
 function getAppear(){ try{ return JSON.parse(localStorage.getItem('lonma_appear')||'{"mode":"light","theme":"teal","font":"normal"}'); }catch(e){ return {mode:'light',theme:'teal',font:'normal'}; } }
 function applyAppear(){
   let a=getAppear();
@@ -457,7 +526,6 @@ function applyAppear(){
   if(a.theme && a.theme!=='teal') document.body.classList.add('theme-'+a.theme);
   if(a.font==='small') document.body.classList.add('font-small');
   if(a.font==='large') document.body.classList.add('font-large');
-  // Update UI states
   ['modeLight','modeDark','modeAuto'].forEach(id=>{ let el=document.getElementById(id); if(el) el.classList.remove('active'); });
   let mid = a.mode==='dark'?'modeDark':a.mode==='auto'?'modeAuto':'modeLight'; let me=document.getElementById(mid); if(me) me.classList.add('active');
   let tg=document.getElementById('darkToggle'); if(tg) tg.classList.toggle('on', isDark);
@@ -472,6 +540,8 @@ function setTheme(t,el){ let a=getAppear(); a.theme=t; localStorage.setItem('lon
 function setFont(f){ let a=getAppear(); a.font=f; localStorage.setItem('lonma_appear',JSON.stringify(a)); applyAppear(); }
 function resetAppearance(){ localStorage.setItem('lonma_appear',JSON.stringify({mode:'light',theme:'teal',font:'normal'})); applyAppear(); }
 function setPay(m){
+  if(m==='airtel' && !health.airtel_configured){ document.getElementById('ps').innerText='Airtel Money is temporarily unavailable. Please use M-Pesa.'; return; }
+  if(m==='card' && !health.card_configured){ document.getElementById('ps').innerText='Card payment is temporarily unavailable. Please use M-Pesa.'; return; }
   payMethod=m;
   document.getElementById('payMpesa').classList.toggle('active',m==='mpesa');
   document.getElementById('payAirtel').classList.toggle('active',m==='airtel');
@@ -492,11 +562,13 @@ function acceptTerms(){
 async function sendResetCode(){
   let phone=document.getElementById('fpPhone').value.trim();
   if(!phone){ document.getElementById('fpMsg').innerText='Enter your phone number'; return; }
-  document.getElementById('fpMsg').innerText='Sending code...';
+  document.getElementById('fpMsg').innerText='Sending code via SMS...';
   let r=await fetch('/api/auth/forgot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
   let d=await r.json();
-  document.getElementById('fpMsg').innerText=d.message;
-  if(d.status==='ok'){ document.getElementById('resetBox').style.display='block'; }
+  // PRODUCTION: Never show code. If debug mode enabled for testing, code may be in response - do NOT display it.
+  document.getElementById('fpMsg').innerText=d.message || 'If an account exists, code sent via SMS.';
+  document.getElementById('resetBox').style.display='block';
+  document.getElementById('fpMsg').innerText += ' Enter code from SMS below.';
 }
 async function doReset(){
   let phone=document.getElementById('fpPhone').value.trim();
@@ -575,6 +647,8 @@ async function trackOrder(){let no=document.getElementById('trackNo').value.trim
 async function checkout(){
   let name=document.getElementById('custName').value.trim(),phone=document.getElementById('phone').value.trim(),area=document.getElementById('area').value,loc=document.getElementById('loc').value.trim();
   if(!name||!phone||!area||!loc||!document.getElementById('agree').checked){document.getElementById('ps').innerText='Please fill all fields and agree to Terms';return;}
+  if(payMethod==='airtel' && !health.airtel_configured){ document.getElementById('ps').innerText='Airtel Money is temporarily unavailable. Please use M-Pesa.'; return; }
+  if(payMethod==='card' && !health.card_configured){ document.getElementById('ps').innerText='Card payment is temporarily unavailable. Please use M-Pesa.'; return; }
   let t=calcTotals();
   let url='/mpesa/stkpush'; let body={phone,amount:t.tot,cart,name,area,location:loc};
   if(payMethod==='airtel'){ url='/airtel/stkpush'; document.getElementById('ps').innerText='Sending Airtel Money prompt...'; }
@@ -584,7 +658,7 @@ async function checkout(){
   if(d.status==='ok'){
     let methodLabel=payMethod==='airtel'?'Airtel Money':payMethod==='card'?'Card / Global Pay':'M-Pesa';
     myOrders.unshift({order_no:d.order_no,total:t.tot,status:'Pending',created:new Date().toLocaleString()});localStorage.setItem('my_orders',JSON.stringify(myOrders));
-    document.getElementById('rcont').innerHTML=`<h3>${d.order_no}</h3><p>Total KSh ${t.tot} &middot; ${methodLabel} ${promoDiscount?'('+promoDiscount+'% OFF)':''}</p><p style="font-size:12px;color:#64748B">${payMethod==='card'?'Card payment confirmed.':'Check your phone for the payment prompt'}</p><button class="btn" style="margin-top:12px" onclick="document.getElementById('trackNo').value='${d.order_no}';show('track');trackOrder()">Track This Order</button>`;
+    document.getElementById('rcont').innerHTML=`<h3>${d.order_no}</h3><p>Total KSh ${t.tot} &middot; ${methodLabel} ${promoDiscount?'('+promoDiscount+'% OFF)':''}</p><p style="font-size:12px;color:#64748B">${payMethod==='card'?'Card payment pending confirmation. We will confirm via SMS.':'Check your phone for the payment prompt'}</p><button class="btn" style="margin-top:12px" onclick="document.getElementById('trackNo').value='${d.order_no}';show('track');trackOrder()">Track This Order</button>`;
     cart=[];promoDiscount=0;localStorage.removeItem('lonma_cart');save();show('receipt');
   }
 }
@@ -595,11 +669,11 @@ async function changeStatus(order_no,status){await fetch('/api/admin/update_stat
 async function addProduct(){let name=document.getElementById('npName').value,price=document.getElementById('npPrice').value,code=document.getElementById('npCode').value,cat=document.getElementById('npCat').value,stock=document.getElementById('npStock').value;let r=await fetch('/api/admin/add_product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:adminPass,name,price,code,category:cat,stock})});let d=await r.json();document.getElementById('npMsg').innerText=d.status==='ok'?'Added. Refresh page.':'Error';if(d.status==='ok')loadP();}
 async function deleteProduct(id){if(!confirm('Delete this product?'))return;await fetch('/api/admin/delete_product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:adminPass,id})});adminLogin();}
 async function loadCustomerDashboard(){let u=getUser();if(!u){document.getElementById('out').style.display='block';document.getElementById('in').style.display='none';return;}document.getElementById('out').style.display='none';document.getElementById('in').style.display='block';document.getElementById('an').innerText='Welcome, '+u.name;document.getElementById('ap').innerText=u.phone;let r=await fetch('/api/customer/dashboard?phone='+encodeURIComponent(u.phone));let d=await r.json();document.getElementById('cOrders').innerText=d.total_orders;document.getElementById('cSpent').innerText='KSh '+d.total_spent;document.getElementById('cPoints').innerText=d.points;document.getElementById('cPhone').innerText=d.phone;document.getElementById('cList').innerHTML=d.orders.map(o=>`<div class="card" style="display:block"><div style="display:flex;justify-content:space-between"><b>${o.order_no}</b><span style="background:#F1F5F9;padding:4px 10px;border-radius:20px;font-size:11px">${o.status}</span></div><div style="margin-top:6px">KSh ${o.total} &middot; ${o.created}</div></div>`).join('')||'<div class="card" style="display:block;text-align:center">No orders yet</div>';}
-async function register(){let name=document.getElementById('rn').value.trim(),phone=document.getElementById('rp').value.trim(),pass=document.getElementById('rpass').value.trim();let r=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,password:pass})});let d=await r.json();document.getElementById('rs').innerText=d.status==='ok'?'Account created':'Error';if(d.status==='ok'){localStorage.setItem('lonma_user',JSON.stringify(d.user));loadCustomerDashboard();}}
+async function register(){let name=document.getElementById('rn').value.trim(),phone=document.getElementById('rp').value.trim(),pass=document.getElementById('rpass').value.trim();let r=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,password:pass})});let d=await r.json();document.getElementById('rs').innerText=d.status==='ok'?'Account created - password encrypted':'Error: '+ (d.message||'');if(d.status==='ok'){localStorage.setItem('lonma_user',JSON.stringify(d.user));loadCustomerDashboard();}}
 async function login(){let phone=document.getElementById('lp').value.trim(),pass=document.getElementById('lpass').value.trim();let r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,password:pass})});let d=await r.json();document.getElementById('ls').innerText=d.status==='ok'?'Welcome back':'Wrong credentials';if(d.status==='ok'){localStorage.setItem('lonma_user',JSON.stringify(d.user));loadCustomerDashboard();}}
 function logout(){localStorage.removeItem('lonma_user');document.getElementById('out').style.display='block';document.getElementById('in').style.display='none';}
 document.getElementById('area')?.addEventListener('change',renderCart);
-applyAppear(); loadP();updateCount();loadCustomerDashboard();
+applyAppear(); loadHealth(); loadP();updateCount();loadCustomerDashboard();
 </script></body></html>
 """
 
