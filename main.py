@@ -23,7 +23,7 @@ def is_blocked(ip):
         BLOCKED[ip]=now+900; return True
     return False
 def record_fail(ip): FAILED[ip].append(time.time())
-def clean_input(s, maxlen=100):
+def clean_input(s, maxlen=500):
     if not isinstance(s,str): return ""
     s=s.strip()[:maxlen]; s=re.sub(r'[<>\"\'`;]', '', s); return s
 
@@ -43,8 +43,14 @@ conn=sqlite3.connect("lonma.db",check_same_thread=False)
 conn.execute("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, name TEXT, price INTEGER, code TEXT, image TEXT, category TEXT, stock INTEGER)")
 conn.execute("CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, order_no TEXT, name TEXT, phone TEXT, area TEXT, location TEXT, items TEXT, total INTEGER, status TEXT, created TEXT, mpesa_receipt TEXT, checkout_id TEXT)")
 conn.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, phone TEXT UNIQUE, name TEXT, password TEXT)")
-cur=conn.cursor(); cur.execute("DELETE FROM products")
-# image field now = emoji + color, NO FILE NEEDED
+conn.execute("CREATE TABLE IF NOT EXISTS reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER, name TEXT, rating INTEGER, text TEXT, created TEXT)")
+conn.execute("CREATE TABLE IF NOT EXISTS promos (code TEXT PRIMARY KEY, discount INTEGER)")
+# ===== COMMUNITY TABLES =====
+conn.execute("CREATE TABLE IF NOT EXISTS community_posts (id INTEGER PRIMARY KEY AUTOINCREMENT, author TEXT, phone TEXT, text TEXT, image TEXT, likes INTEGER DEFAULT 0, reposts INTEGER DEFAULT 0, created TEXT)")
+conn.execute("CREATE TABLE IF NOT EXISTS community_comments (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, author TEXT, text TEXT, created TEXT)")
+conn.execute("CREATE TABLE IF NOT EXISTS community_likes (post_id INTEGER, phone TEXT, UNIQUE(post_id, phone))")
+cur=conn.cursor(); cur.execute("DELETE FROM products"); cur.execute("DELETE FROM promos")
+cur.execute("INSERT OR IGNORE INTO promos VALUES ('LONMA10',10)"); cur.execute("INSERT OR IGNORE INTO promos VALUES ('WELCOME20',20)"); cur.execute("INSERT OR IGNORE INTO promos VALUES ('FREEDEL',100)")
 PRODS=[
 (1,"Diva Anti-Dandruff Pomade 250ml",250,"DIV-001","💇|#fce7f3","Pomades",45),
 (2,"Detrex Pine Drops Soap 110g",95,"DET-002","🧼|#dcfce7","Soaps",80),
@@ -58,6 +64,17 @@ PRODS=[
 ]
 for pid,name,price,code,img,cat,stock in PRODS:
     cur.execute("INSERT INTO products VALUES (?,?,?,?,?,?,?)",(pid,name,price,code,img,cat,stock))
+# Seed community posts if empty
+cur.execute("SELECT COUNT(*) FROM community_posts")
+if cur.fetchone()[0]==0:
+    seeds=[
+        ("LONMA ORBIT Official","0700000000","Welcome to LONMA Community! 🎉 Share your shopping, recipes, reviews! Use #LONMA #Detrex #Diva","",42,5),
+        ("Mary Wanjiru","0712345678","Just bought Detrex Pine Drops 🧼 My house smells amazing! Who else loves it? #Detrex #CleanHome", "🧼|#dcfce7",18,2),
+        ("Kevin Otieno","0723456789","Fresh Fri Oil 2L for only 890? Best deal in Nairobi! 🔥 #FreshFri #Deals","🍳|#fef3c7",25,4),
+        ("Amina Hassan","0734567890","Diva Pomade made my hair so soft 💇‍♀️ Highly recommend! #Diva #HairCare","💇|#fce7f3",31,3),
+    ]
+    for a,p,t,img,l,r in seeds:
+        cur.execute("INSERT INTO community_posts (author,phone,text,image,likes,reposts,created) VALUES (?,?,?,?,?,?,?)",(a,p,t,img,l,r,datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
 conn.commit()
 
 def get_token():
@@ -79,10 +96,76 @@ async def callback(request:Request):
         return {"ResultCode":0,"ResultDesc":"Accepted"}
     except: return {"ResultCode":0,"ResultDesc":"Accepted"}
 
+# ===== COMMUNITY APIs =====
+@app.get("/api/community/posts")
+def get_posts(phone:str=""):
+    cur=conn.cursor(); cur.execute("SELECT id,author,phone,text,image,likes,reposts,created FROM community_posts ORDER BY id DESC LIMIT 50")
+    out=[]
+    for r in cur.fetchall():
+        cur2=conn.cursor(); cur2.execute("SELECT COUNT(*) FROM community_comments WHERE post_id=?",(r[0],)); cc=cur2.fetchone()[0]
+        liked=False
+        if phone:
+            cur2.execute("SELECT 1 FROM community_likes WHERE post_id=? AND phone=?",(r[0],phone,)); liked=cur2.fetchone() is not None
+        out.append({"id":r[0],"author":r[1],"phone":r[2],"text":r[3],"image":r[4],"likes":r[5],"reposts":r[6],"created":r[7],"comments":cc,"liked":liked})
+    return out
+
+@app.post("/api/community/post")
+async def create_post(req:Request):
+    d=await req.json(); text=clean_input(d.get("text",""),500); author=clean_input(d.get("author","Customer"),30); phone=clean_input(d.get("phone",""),15)
+    if not text: return {"status":"error","message":"Empty"}
+    if len(text)<2: return {"status":"error"}
+    conn.execute("INSERT INTO community_posts (author,phone,text,image,likes,reposts,created) VALUES (?,?,?,?,0,0,?)",(author,phone,text,"",datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))); conn.commit()
+    return {"status":"ok"}
+
+@app.post("/api/community/like")
+async def like_post(req:Request):
+    d=await req.json()
+    try: pid=int(d.get("post_id",0))
+    except: return {"status":"error"}
+    phone=clean_input(d.get("phone",""),15)
+    cur=conn.cursor(); cur.execute("SELECT 1 FROM community_likes WHERE post_id=? AND phone=?",(pid,phone,))
+    if cur.fetchone():
+        conn.execute("DELETE FROM community_likes WHERE post_id=? AND phone=?",(pid,phone,)); conn.execute("UPDATE community_posts SET likes=likes-1 WHERE id=?",(pid,)); conn.commit(); return {"status":"unliked"}
+    conn.execute("INSERT INTO community_likes VALUES (?,?)",(pid,phone,)); conn.execute("UPDATE community_posts SET likes=likes+1 WHERE id=?",(pid,)); conn.commit(); return {"status":"liked"}
+
+@app.post("/api/community/repost")
+async def repost(req:Request):
+    d=await req.json()
+    try: pid=int(d.get("post_id",0))
+    except: return {"status":"error"}
+    conn.execute("UPDATE community_posts SET reposts=reposts+1 WHERE id=?",(pid,)); conn.commit(); return {"status":"ok"}
+
+@app.get("/api/community/comments/{pid}")
+def get_comments(pid:int):
+    cur=conn.cursor(); cur.execute("SELECT author,text,created FROM community_comments WHERE post_id=? ORDER BY id ASC",(pid,)); return [{"author":r[0],"text":r[1],"created":r[2]} for r in cur.fetchall()]
+
+@app.post("/api/community/comment")
+async def add_comment(req:Request):
+    d=await req.json()
+    try: pid=int(d.get("post_id",0))
+    except: return {"status":"error"}
+    conn.execute("INSERT INTO community_comments (post_id,author,text,created) VALUES (?,?,?,?)",(pid,clean_input(d.get("author","Customer"),30),clean_input(d.get("text",""),300),datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))); conn.commit()
+    return {"status":"ok"}
+
+@app.get("/api/community/trending")
+def trending():
+    cur=conn.cursor(); cur.execute("SELECT text FROM community_posts")
+    tags={}
+    for (t,) in cur.fetchall():
+        for w in t.split():
+            if w.startswith("#"):
+                tags[w]=tags.get(w,0)+1
+    sorted_tags=sorted(tags.items(), key=lambda x:-x[1])[:6]
+    return [{"tag":k,"count":v} for k,v in sorted_tags] or [{"tag":"#LONMA","count":42},{"tag":"#Detrex","count":28},{"tag":"#Diva","count":19},{"tag":"#Deals","count":15}]
+
 @app.get("/api/products")
 def prods_api():
     cur=conn.cursor(); cur.execute("SELECT id,name,price,code,image,category,stock FROM products")
-    return [{"id":r[0],"name":r[1],"price":r[2],"code":r[3],"image":r[4],"category":r[5],"stock":r[6]} for r in cur.fetchall()]
+    out=[]
+    for r in cur.fetchall():
+        cur2=conn.cursor(); cur2.execute("SELECT AVG(rating), COUNT(*) FROM reviews WHERE product_id=?",(r[0],)); avg=cur2.fetchone()
+        out.append({"id":r[0],"name":r[1],"price":r[2],"code":r[3],"image":r[4],"category":r[5],"stock":r[6],"rating":round(avg[0],1) if avg[0] else 4.5,"reviews":avg[1]})
+    return out
 
 @app.get("/api/verify/{code}")
 def verify(code:str):
@@ -96,6 +179,30 @@ def orders_api(phone:str=""):
     else: cur.execute("SELECT order_no,name,total,status,created FROM orders ORDER BY id DESC LIMIT 50")
     return [{"order_no":r[0],"name":r[1],"total":r[2],"status":r[3],"created":r[4]} for r in cur.fetchall()]
 
+@app.get("/api/track/{order_no}")
+def track(order_no:str):
+    cur=conn.cursor(); cur.execute("SELECT order_no,total,status,created FROM orders WHERE order_no=?",(clean_input(order_no,20),)); r=cur.fetchone()
+    if not r: return {"found":False}
+    steps=["Pending","PAID","Shipped","Delivered"]; idx=steps.index(r[2]) if r[2] in steps else 0
+    return {"found":True,"order_no":r[0],"total":r[1],"status":r[2],"created":r[3],"progress":(idx+1)*25}
+
+@app.post("/api/promo/check")
+async def promo_check(req:Request):
+    d=await req.json(); cur=conn.cursor(); cur.execute("SELECT discount FROM promos WHERE code=?",(clean_input(d.get("code",""),20).upper(),)); r=cur.fetchone()
+    return {"valid":True,"discount":r[0]} if r else {"valid":False}
+
+@app.get("/api/reviews/{pid}")
+def get_reviews(pid:int):
+    cur=conn.cursor(); cur.execute("SELECT name,rating,text,created FROM reviews WHERE product_id=? ORDER BY id DESC LIMIT 10",(pid,)); return [{"name":r[0],"rating":r[1],"text":r[2],"created":r[3]} for r in cur.fetchall()]
+
+@app.post("/api/reviews/add")
+async def add_review(req:Request):
+    d=await req.json()
+    try: pid=int(d.get("product_id",0)); rating=int(d.get("rating",5))
+    except: return {"status":"error"}
+    conn.execute("INSERT INTO reviews (product_id,name,rating,text,created) VALUES (?,?,?,?,?)",(pid,clean_input(d.get("name","Customer"),30),rating,clean_input(d.get("text",""),200),datetime.datetime.now().strftime("%Y-%m-%d"))); conn.commit()
+    return {"status":"ok"}
+
 @app.post("/api/admin/check")
 async def admin_check(req:Request):
     ip=req.client.host if req.client else "unknown"
@@ -105,11 +212,50 @@ async def admin_check(req:Request):
         FAILED[ip]=[]; return {"status":"ok"}
     record_fail(ip); return {"status":"error","message":"Wrong password"}
 
-@app.get("/api/admin/orders")
-def admin_orders(password:str=""):
-    if password!=ADMIN_PASSWORD: return []
-    cur=conn.cursor(); cur.execute("SELECT order_no,name,phone,total,status,created FROM orders ORDER BY id DESC")
-    return [{"order_no":r[0],"name":r[1],"phone":r[2],"total":r[3],"status":r[4],"created":r[5]} for r in cur.fetchall()]
+@app.get("/api/admin/dashboard")
+def admin_dash(password:str=""):
+    if password!=ADMIN_PASSWORD: return {"error":"unauthorized"}
+    cur=conn.cursor()
+    cur.execute("SELECT COUNT(*), COALESCE(SUM(total),0) FROM orders"); o=cur.fetchone()
+    cur.execute("SELECT COUNT(*) FROM users"); u=cur.fetchone()
+    cur.execute("SELECT COUNT(*) FROM products"); p=cur.fetchone()
+    cur.execute("SELECT COUNT(*) FROM community_posts"); cp=cur.fetchone()
+    cur.execute("SELECT order_no,name,phone,total,status,created FROM orders ORDER BY id DESC LIMIT 30"); orders=[{"order_no":r[0],"name":r[1],"phone":r[2],"total":r[3],"status":r[4],"created":r[5]} for r in cur.fetchall()]
+    cur.execute("SELECT phone,name FROM users ORDER BY id DESC LIMIT 30"); customers=[{"phone":r[0],"name":r[1]} for r in cur.fetchall()]
+    for c in customers:
+        cur.execute("SELECT COUNT(*), COALESCE(SUM(total),0) FROM orders WHERE phone=?",(c["phone"],)); r=cur.fetchone(); c["orders"]=r[0]; c["spent"]=r[1]
+    cur.execute("SELECT id,name,price,stock,category FROM products ORDER BY stock ASC"); prods=[{"id":r[0],"name":r[1],"price":r[2],"stock":r[3],"category":r[4]} for r in cur.fetchall()]
+    return {"total_orders":o[0],"total_sales":o[1],"total_customers":u[0],"total_products":p[0],"total_posts":cp[0],"orders":orders,"customers":customers,"products":prods}
+
+@app.post("/api/admin/update_status")
+async def upd_status(req:Request):
+    d=await req.json()
+    if d.get("password")!=ADMIN_PASSWORD: return {"status":"error"}
+    conn.execute("UPDATE orders SET status=? WHERE order_no=?",(clean_input(d.get("status",""),20),clean_input(d.get("order_no",""),20))); conn.commit()
+    return {"status":"ok"}
+
+@app.post("/api/admin/add_product")
+async def add_prod(req:Request):
+    d=await req.json()
+    if d.get("password")!=ADMIN_PASSWORD: return {"status":"error"}
+    cur=conn.cursor(); cur.execute("SELECT MAX(id) FROM products"); nid=(cur.fetchone()[0] or 0)+1
+    conn.execute("INSERT INTO products VALUES (?,?,?,?,?,?,?)",(nid,clean_input(d.get("name",""),80),int(d.get("price",0)),clean_input(d.get("code",""),20),d.get("image","📦|#f1f5f9"),clean_input(d.get("category",""),20),int(d.get("stock",0)))); conn.commit()
+    return {"status":"ok"}
+
+@app.post("/api/admin/delete_product")
+async def del_prod(req:Request):
+    d=await req.json()
+    if d.get("password")!=ADMIN_PASSWORD: return {"status":"error"}
+    conn.execute("DELETE FROM products WHERE id=?",(int(d.get("id",0)),)); conn.commit()
+    return {"status":"ok"}
+
+@app.get("/api/customer/dashboard")
+def cust_dash(phone:str=""):
+    phone=clean_input(phone,15); cur=conn.cursor()
+    cur.execute("SELECT name FROM users WHERE phone=?",(phone,)); u=cur.fetchone()
+    cur.execute("SELECT order_no,total,status,created FROM orders WHERE phone=? ORDER BY id DESC",(phone,)); orders=[{"order_no":r[0],"total":r[1],"status":r[2],"created":r[3]} for r in cur.fetchall()]
+    total=sum(o["total"] for o in orders)
+    return {"name":u[0] if u else "Customer","phone":phone,"orders":orders,"total_orders":len(orders),"total_spent":total,"points":total//100}
 
 @app.post("/mpesa/stkpush")
 async def stk(req:Request):
@@ -174,44 +320,120 @@ input,select,textarea{width:100%;padding:14px;border-radius:14px;border:1px soli
 .side{position:fixed;top:0;left:-320px;width:300px;height:100%;background:#fff;z-index:2000;transition:.35s;box-shadow:20px 0 60px rgba(0,0,0,.12)}.side.open{left:0}.overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,.4);z-index:1999}.overlay.open{display:block}
 .top-box{background:var(--dark);padding:28px 20px;color:#fff;text-align:center}.lc{width:70px;height:70px;background:#fff;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center}.lc img{width:66px;height:66px;border-radius:50%}
 .menu{padding:12px 0}.mi{display:flex;align-items:center;gap:14px;padding:15px 20px;cursor:pointer}.mi:hover{background:#f8fafc}.mi b{font-size:14px;font-weight:600;flex:1}.ico{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:17px}.tag{font-size:11px;font-weight:800;padding:5px 10px;border-radius:20px}.div{height:1px;background:#f1f5f9;margin:8px 20px}.label{font-size:10px;font-weight:800;letter-spacing:.2em;color:#94a3b8;padding:14px 20px 6px}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:10px}.statbox{background:#fff;border-radius:16px;padding:14px;border:1px solid #f1f5f9}.statbox b{font-size:20px}.statbox span{font-size:11px;color:#64748b}
+.dashtab{display:flex;gap:8px;overflow-x:auto;padding:8px 0}.dtab{white-space:nowrap;padding:8px 16px;border-radius:20px;background:#fff;border:1px solid var(--line);font-size:12px;font-weight:700;cursor:pointer}.dtab.active{background:var(--dark);color:#fff}
+.wa{position:fixed;bottom:80px;right:14px;background:#25D366;color:#fff;width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;z-index:900;box-shadow:0 8px 20px rgba(0,0,0,.2);cursor:pointer}
+.progress{height:8px;background:#e2e8f0;border-radius:10px;overflow:hidden}.progress div{height:100%;background:var(--teal)}
+.tweet{border-bottom:1px solid #e2e8f0;padding:14px 0}.avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#0A9EBB,#0f172a);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0}
+.tweet-actions{display:flex;gap:20px;margin-top:10px;color:#64748b;font-size:13px}.tweet-actions span{cursor:pointer}
+.hashtag{color:#0A9EBB;font-weight:700}
 </style></head><body>
-<div class="nav"><div class="nav-top"><div class="logo" onclick="show('products')"><img src="/logo.png"><b>LONMA ORBIT</b></div><div class="cart-pill" onclick="show('cart')">CART <span id="cartCount" class="cart-num" style="display:none">0</span></div></div><div class="search-wrap"><div class="search-box"><span class="burger" onclick="openMenu()">☰</span><input id="searchInput" placeholder="Search Diva, Detrex, Sawa..." oninput="filterProducts()"></div></div><div class="cat-chips"><div class="chip active" onclick="filterCat('All',this)">All</div><div class="chip" onclick="filterCat('Soaps',this)">Soaps</div><div class="chip" onclick="filterCat('Lotions',this)">Lotions</div><div class="chip" onclick="filterCat('Pomades',this)">Pomades</div><div class="chip" onclick="filterCat('Cooking Oils',this)">Oils</div></div></div>
+<div class="nav"><div class="nav-top"><div class="logo" onclick="show('products')"><img src="/logo.png"><b>LONMA ORBIT</b></div><div style="display:flex;gap:8px"><div class="cart-pill" style="background:#fff;color:var(--dark);border:1px solid var(--line)" onclick="show('wishlist')">❤️ <span id="wishCount">0</span></div><div class="cart-pill" onclick="show('cart')">CART <span id="cartCount" class="cart-num" style="display:none">0</span></div></div></div><div class="search-wrap"><div class="search-box"><span class="burger" onclick="openMenu()">☰</span><input id="searchInput" placeholder="Search Diva, Detrex, Sawa..." oninput="filterProducts()"></div></div><div class="cat-chips"><div class="chip active" onclick="filterCat('All',this)">All</div><div class="chip" onclick="filterCat('Soaps',this)">Soaps</div><div class="chip" onclick="filterCat('Lotions',this)">Lotions</div><div class="chip" onclick="filterCat('Pomades',this)">Pomades</div><div class="chip" onclick="filterCat('Cooking Oils',this)">Oils</div></div></div>
+<div class="wa" onclick="openWA()">💬</div>
 <div class="overlay" id="overlay" onclick="closeMenu()"></div>
-<div class="side" id="side"><div class="top-box"><div style="text-align:right"><span style="background:rgba(255,255,255,.15);padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer" onclick="show('cart');closeMenu()">VIEW CART</span></div><div class="lc" onclick="show('products');closeMenu()"><img src="/logo.png"></div><div style="font-weight:800;font-size:19px;margin-top:12px">LONMA ORBIT</div><div style="opacity:.8;font-size:12px;margin-top:4px">100% Genuine • Fast Delivery • Secured 🔒</div></div><div class="menu"><div class="label">SHOP</div><div class="mi" onclick="show('products');closeMenu()"><div class="ico" style="background:#f0fdfa">🏠</div><b>Home • Products</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="mi" onclick="show('cart');closeMenu()"><div class="ico" style="background:#fef3c7">🛒</div><b>Cart</b><span class="tag" style="background:#f1f5f9" id="mc">0</span></div><div class="mi" onclick="show('orders');closeMenu()"><div class="ico" style="background:#dbeafe">📦</div><b>Orders</b></div><div class="div"></div><div class="label">SUPPORT</div><div class="mi" onclick="show('scan');closeMenu()"><div class="ico" style="background:#dcfce7">🛡️</div><b>Verify Product</b></div><div class="mi" onclick="show('account');closeMenu()"><div class="ico" style="background:#f1f5f9">👤</div><b>My Account</b></div><div class="mi" onclick="show('terms');closeMenu()"><div class="ico" style="background:#fef3c7">📄</div><b>Terms</b></div><div class="div"></div><div class="mi" onclick="show('admin');closeMenu()" style="opacity:.6"><div class="ico" style="background:#0f172a;color:#fff">🔐</div><b>Admin</b></div><div style="text-align:center;padding:18px;color:#94a3b8;font-size:11px">v6.1 Sorted • 🇰🇪</div></div></div>
-<div id="products" class="page active"><div class="banner"><div><div style="font-weight:800;font-size:15px">FREE Delivery</div><div style="font-size:12px;opacity:.9">Orders over KSh 2000</div></div><div style="background:#fff;color:var(--dark);padding:6px 14px;border-radius:20px;font-weight:800;font-size:12px">SHOP NOW</div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px"><h3 style="margin:0">Products</h3><select id="sortSelect" onchange="filterProducts()" style="width:auto;padding:8px 12px;font-size:12px;font-weight:700;margin:0"><option value="featured">Sort: Featured</option><option value="low">Price: Low → High</option><option value="high">Price: High → Low</option><option value="name">Name: A → Z</option></select></div><div style="text-align:right;font-size:12px;color:#64748b;margin-bottom:4px" id="pCount">9 items</div><div id="plist"></div></div>
-<div id="cart" class="page"><h3>Cart</h3><div id="cartItems"></div><div id="cartSum" style="display:none"><div class="card" style="display:block"><div style="display:flex;justify-content:space-between"><span>Subtotal (<span id="tItems">0</span>)</span><b>KSh <span id="sub">0</span></b></div><div style="display:flex;justify-content:space-between;margin-top:8px"><span>Delivery</span><b id="delFee"></b></div><div style="display:flex;justify-content:space-between;margin-top:12px;font-size:18px;border-top:1px solid #f1f5f9;padding-top:12px"><span>Total</span><b>KSh <span id="tot">0</span></b></div><div style="margin-top:16px"><input id="custName" placeholder="Full Name"><input id="phone" placeholder="M-Pesa 07..."><select id="area"><option value="">Select Area</option><option value="CBD">CBD - 150</option><option value="Westlands">Westlands - 200</option><option value="Upcountry">Upcountry - 350</option></select><textarea id="loc" placeholder="Exact location / building"></textarea><label style="font-size:12px;display:flex;gap:8px;align-items:center;margin:12px 0"><input type="checkbox" id="agree" style="width:auto"> I agree to <a href="#" onclick="show('terms');return false" style="color:#0A9EBB;font-weight:800">Terms</a></label></div><button class="btn" onclick="checkout()">Pay KSh <span id="pay">0</span> with M-Pesa</button><p id="ps" style="text-align:center;font-size:13px"></p></div></div><div id="emptyCart" class="card" style="text-align:center;padding:30px;display:block"><div style="font-size:40px">🛒</div><h4>Your cart is empty</h4><button class="btn btn-teal" onclick="show('products')">Start Shopping</button></div></div>
+<div class="side" id="side"><div class="top-box"><div style="text-align:right"><span style="background:rgba(255,255,255,.15);padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer" onclick="show('cart');closeMenu()">VIEW CART</span></div><div class="lc" onclick="show('products');closeMenu()"><img src="/logo.png"></div><div style="font-weight:800;font-size:19px;margin-top:12px">LONMA ORBIT</div><div style="opacity:.8;font-size:12px;margin-top:4px">100% Genuine • Fast Delivery • Secured 🔒</div><div style="margin-top:10px;background:#0A9EBB;padding:8px;border-radius:10px;font-size:12px;font-weight:800">🎁 Promo: LONMA10 = 10% OFF • WELCOME20 = 20% OFF</div></div><div class="menu"><div class="label">SHOP</div><div class="mi" onclick="show('products');closeMenu()"><div class="ico" style="background:#f0fdfa">🏠</div><b>Home • Products</b><span class="tag" style="background:var(--teal);color:#fff">NEW</span></div><div class="mi" onclick="show('wishlist');closeMenu()"><div class="ico" style="background:#fce7f3">❤️</div><b>Wishlist</b><span class="tag" style="background:#fce7f3" id="mcWish">0</span></div><div class="mi" onclick="show('cart');closeMenu()"><div class="ico" style="background:#fef3c7">🛒</div><b>Cart</b><span class="tag" style="background:#f1f5f9" id="mc">0</span></div><div class="mi" onclick="show('track');closeMenu()"><div class="ico" style="background:#dbeafe">🚚</div><b>Track Order</b></div><div class="div"></div><div class="label">COMMUNITY</div><div class="mi" onclick="show('community');closeMenu()"><div class="ico" style="background:#000;color:#fff">𝕏</div><b>Community • Twitter-like</b><span class="tag" style="background:#000;color:#fff">NEW 🔥</span></div><div class="div"></div><div class="label">MY DASHBOARD</div><div class="mi" onclick="show('account');closeMenu()"><div class="ico" style="background:#dcfce7">👤</div><b>My Dashboard</b><span class="tag" style="background:#dcfce7;color:#166534">CUSTOMER</span></div><div class="div"></div><div class="label">SUPPORT</div><div class="mi" onclick="show('scan');closeMenu()"><div class="ico" style="background:#dcfce7">🛡️</div><b>Verify Product</b></div><div class="mi" onclick="openWA()"><div class="ico" style="background:#dcfce7">💬</div><b>WhatsApp Us</b></div><div class="mi" onclick="show('terms');closeMenu()"><div class="ico" style="background:#fef3c7">📄</div><b>Terms</b></div><div class="div"></div><div class="mi" onclick="show('admin');closeMenu()"><div class="ico" style="background:#0f172a;color:#fff">🔐</div><b>Admin Dashboard</b><span class="tag" style="background:#0f172a;color:#fff">ADMIN</span></div><div style="text-align:center;padding:18px;color:#94a3b8;font-size:11px">v9.0 Community • 🇰🇪</div></div></div>
+
+<div id="products" class="page active"><div class="banner"><div><div style="font-weight:800;font-size:15px">FREE Delivery</div><div style="font-size:12px;opacity:.9">Orders over KSh 2000 • Use LONMA10</div></div><div style="background:#fff;color:var(--dark);padding:6px 14px;border-radius:20px;font-weight:800;font-size:12px" onclick="show('community')">JOIN COMMUNITY →</div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px"><h3 style="margin:0">Products</h3><select id="sortSelect" onchange="filterProducts()" style="width:auto;padding:8px 12px;font-size:12px;font-weight:700;margin:0"><option value="featured">Sort: Featured</option><option value="low">Price: Low → High</option><option value="high">Price: High → Low</option><option value="name">Name: A → Z</option><option value="rating">Top Rated</option></select></div><div style="text-align:right;font-size:12px;color:#64748b;margin-bottom:4px" id="pCount">9 items</div><div id="plist"></div></div>
+
+<div id="community" class="page"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">𝕏 Community</h3><span style="font-size:12px;background:#000;color:#fff;padding:6px 12px;border-radius:20px">LONMA Social</span></div><div class="card" style="display:block;margin-top:12px"><div style="display:flex;gap:10px"><div class="avatar" id="myAvatar">?</div><textarea id="postText" placeholder="What's happening? Share deals, recipes, reviews... Use #Detrex #Diva" style="flex:1;border:none;outline:none;resize:none" rows="3"></textarea></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><span style="font-size:12px;color:#64748b">💡 Tip: Post a product review & get points!</span><button class="btn" style="width:auto;padding:10px 24px;border-radius:20px;background:#000" onclick="createPost()">Post</button></div></div><div class="card" style="display:block"><h4 style="margin:0 0 8px">🔥 Trending in LONMA</h4><div id="trendingList"></div></div><div id="feed"></div></div>
+
+<div id="wishlist" class="page"><h3>❤️ My Wishlist</h3><div id="wishList"></div></div>
+<div id="track" class="page"><h3>🚚 Track Order</h3><div class="card" style="display:block"><input id="trackNo" placeholder="LONMA123456"><button class="btn btn-teal" onclick="trackOrder()">Track</button><div id="trackRes" style="margin-top:14px"></div></div></div>
+<div id="productDetail" class="page"><div id="detailContent"></div></div>
+
+<div id="cart" class="page"><h3>Cart</h3><div id="cartItems"></div><div id="cartSum" style="display:none"><div class="card" style="display:block"><div style="display:flex;gap:8px"><input id="promoCode" placeholder="Promo code e.g. LONMA10" style="flex:1"><button class="btn" style="width:auto;padding:12px 18px" onclick="applyPromo()">Apply</button></div><p id="promoMsg" style="font-size:12px;font-weight:700"></p><div style="display:flex;justify-content:space-between"><span>Subtotal (<span id="tItems">0</span>)</span><b>KSh <span id="sub">0</span></b></div><div style="display:flex;justify-content:space-between;margin-top:8px"><span>Discount</span><b id="discFee" style="color:#16a34a">KSh 0</b></div><div style="display:flex;justify-content:space-between;margin-top:8px"><span>Delivery</span><b id="delFee"></b></div><div style="display:flex;justify-content:space-between;margin-top:12px;font-size:18px;border-top:1px solid #f1f5f9;padding-top:12px"><span>Total</span><b>KSh <span id="tot">0</span></b></div><div style="margin-top:16px"><input id="custName" placeholder="Full Name"><input id="phone" placeholder="M-Pesa 07..."><select id="area"><option value="">Select Area</option><option value="CBD">CBD - 150</option><option value="Westlands">Westlands - 200</option><option value="Upcountry">Upcountry - 350</option></select><textarea id="loc" placeholder="Exact location / building"></textarea><label style="font-size:12px;display:flex;gap:8px;align-items:center;margin:12px 0"><input type="checkbox" id="agree" style="width:auto"> I agree to <a href="#" onclick="show('terms');return false" style="color:#0A9EBB;font-weight:800">Terms</a></label></div><button class="btn" onclick="checkout()">Pay KSh <span id="pay">0</span> with M-Pesa</button><button class="btn" style="background:#25D366;margin-top:8px" onclick="orderViaWA()">Order via WhatsApp 💬</button><p id="ps" style="text-align:center;font-size:13px"></p></div></div><div id="emptyCart" class="card" style="text-align:center;padding:30px;display:block"><div style="font-size:40px">🛒</div><h4>Your cart is empty</h4><button class="btn btn-teal" onclick="show('products')">Start Shopping</button></div></div>
+
 <div id="orders" class="page"><h3>Orders</h3><div style="display:flex;gap:8px;margin-bottom:12px"><input id="phLookup" placeholder="Enter phone 07..."><button class="btn" style="width:auto;padding:10px 20px" onclick="loadOrders()">Load</button></div><div id="olist"></div><div id="noOrd" class="card" style="text-align:center;display:block"><p>No orders yet</p></div></div>
 <div id="scan" class="page"><h3>Verify Authenticity</h3><div class="card" style="display:block;padding:20px;text-align:center"><div style="font-size:40px">🛡️</div><h4>Check Product</h4><p style="font-size:12px;color:#64748b">Enter code like DIV-001</p><input id="vcode" placeholder="DIV-001"><button class="btn btn-teal" onclick="verify()" style="margin-top:10px">Verify Now</button><p id="vres" style="font-weight:700;margin-top:12px"></p></div></div>
-<div id="account" class="page"><div id="out"><div class="card" style="display:block"><h4>Create Account</h4><input id="rn" placeholder="Full name"><input id="rp" placeholder="07xxxxxxxx"><input id="rpass" type="password" placeholder="Password"><button class="btn" onclick="register()">Create Account</button><p id="rs"></p></div><div class="card" style="display:block"><h4>Sign In</h4><input id="lp" placeholder="07xxxxxxxx"><input id="lpass" type="password" placeholder="Password"><button class="btn" style="background:var(--teal)" onclick="login()">Sign In</button><p id="ls"></p></div></div><div id="in" style="display:none"><div class="card" style="display:block;background:var(--dark);color:#fff;text-align:center;padding:24px"><h3 id="an" style="margin:12px 0 4px">Welcome</h3><p id="ap" style="opacity:.7;font-size:13px"></p><button class="btn" style="background:#fff;color:var(--dark);margin-top:16px" onclick="logout()">Sign Out</button></div></div></div>
-<div id="terms" class="page"><h3>Terms & Conditions</h3><div class="card" style="display:block;line-height:1.7;font-size:13px;padding:18px"><h4>1. Delivery</h4><p>CBD KSh 150, Westlands KSh 200, Upcountry KSh 350. FREE for orders KSh 2000+.</p><h4>2. Payments</h4><p>All payments via M-Pesa STK Push. Order confirmed after receipt.</p><h4>3. Authenticity</h4><p>100% genuine Pwani products. Verify code.</p><h4>4. Returns</h4><p>Returns within 24hrs if unopened with receipt.</p><p style="margin-top:16px;font-size:11px;color:#94a3b8">v6.1 • Made in Kenya 🇰🇪</p><button class="btn" style="margin-top:14px" onclick="show('cart')">Back to Cart</button></div></div>
-<div id="admin" class="page"><h3>Admin 🔒</h3><div class="card" style="display:block"><input id="apass" type="password" placeholder="Admin Password"><button class="btn" onclick="adminLogin()">Secure Login</button><p id="ast"></p></div><div id="acont" style="display:none"><div id="alist"></div></div></div>
+<div id="account" class="page"><div id="out"><div class="card" style="display:block"><h4>Create Account</h4><input id="rn" placeholder="Full name"><input id="rp" placeholder="07xxxxxxxx"><input id="rpass" type="password" placeholder="Password"><button class="btn" onclick="register()">Create Account</button><p id="rs"></p></div><div class="card" style="display:block"><h4>Sign In</h4><input id="lp" placeholder="07xxxxxxxx"><input id="lpass" type="password" placeholder="Password"><button class="btn" style="background:var(--teal)" onclick="login()">Sign In</button><p id="ls"></p></div></div><div id="in" style="display:none"><div class="card" style="display:block;background:var(--dark);color:#fff;text-align:center;padding:24px"><h3 id="an" style="margin:12px 0 4px">Welcome</h3><p id="ap" style="opacity:.7;font-size:13px"></p><button class="btn" style="background:#fff;color:var(--dark);margin-top:16px" onclick="logout()">Sign Out</button></div><div class="stat" style="margin-top:12px"><div class="statbox"><b id="cOrders">0</b><br><span>My Orders</span></div><div class="statbox"><b id="cSpent">KSh 0</b><br><span>Total Spent</span></div><div class="statbox"><b id="cPoints">0</b><br><span>Points</span></div><div class="statbox"><b id="cPhone">-</b><br><span>Phone</span></div></div><h4 style="margin:18px 0 6px">My Orders History</h4><div id="cList"></div></div></div>
+<div id="terms" class="page"><h3>Terms & Conditions</h3><div class="card" style="display:block;line-height:1.7;font-size:13px;padding:18px"><h4>1. Delivery</h4><p>CBD KSh 150, Westlands KSh 200, Upcountry KSh 350. FREE for orders KSh 2000+. Promo LONMA10 = 10% OFF.</p><h4>2. Payments</h4><p>All payments via M-Pesa STK Push. Order confirmed after receipt.</p><h4>3. Community Rules</h4><p>Be kind. No spam, no insults, no fake reviews. Admin can delete posts.</p><p style="margin-top:16px;font-size:11px;color:#94a3b8">v9.0 • Made in Kenya 🇰🇪</p><button class="btn" style="margin-top:14px" onclick="show('cart')">Back to Cart</button></div></div>
+<div id="admin" class="page"><h3>Admin Dashboard 🔐</h3><div id="adminLoginBox" class="card" style="display:block"><input id="apass" type="password" placeholder="Admin Password"><button class="btn" onclick="adminLogin()">Secure Login</button><p id="ast"></p></div><div id="acont" style="display:none"><div class="stat"><div class="statbox" style="background:#0f172a;color:#fff"><b id="aSales">KSh 0</b><br><span style="color:#cbd5e1">Total Sales</span></div><div class="statbox"><b id="aOrders">0</b><br><span>Total Orders</span></div><div class="statbox"><b id="aCust">0</b><br><span>Customers</span></div><div class="statbox"><b id="aProd">0</b><br><span>Products</span></div></div><div class="stat" style="margin-top:10px"><div class="statbox" style="background:#000;color:#fff"><b id="aPosts">0</b><br><span>Community Posts</span></div><div class="statbox"><b>🔥 Live</b><br><span>Community Active</span></div></div><div class="dashtab"><div class="dtab active" onclick="switchAdminTab('orders',this)">📦 Orders</div><div class="dtab" onclick="switchAdminTab('customers',this)">👥 Customers</div><div class="dtab" onclick="switchAdminTab('stock',this)">📊 Stock</div><div class="dtab" onclick="switchAdminTab('add',this)">➕ Add Product</div></div><div id="aOrdersList"></div><div id="aCustList" style="display:none"></div><div id="aStockList" style="display:none"></div><div id="aAdd" style="display:none"><div class="card" style="display:block"><input id="npName" placeholder="Product Name"><input id="npPrice" type="number" placeholder="Price"><input id="npCode" placeholder="Code e.g. DIV-010"><select id="npCat"><option>Soaps</option><option>Lotions</option><option>Pomades</option><option>Cooking Oils</option></select><input id="npStock" type="number" placeholder="Stock"><button class="btn btn-teal" onclick="addProduct()">Add Product</button><p id="npMsg"></p></div></div></div></div>
 <div id="receipt" class="page"><div class="card" style="display:block;text-align:center;padding:24px" id="rcont"></div><button class="btn" onclick="show('products')">Continue Shopping</button></div>
-<div class="bottom"><div id="b-products" class="active" onclick="show('products')">🏠<br>Home</div><div id="b-cart" onclick="show('cart')">🛒<br>Cart</div><div id="b-orders" onclick="show('orders')">📦<br>Orders</div><div id="b-account" onclick="show('account')">👤<br>Account</div></div>
+<div class="bottom"><div id="b-products" class="active" onclick="show('products')">🏠<br>Home</div><div id="b-community" onclick="show('community')">𝕏<br>Community</div><div id="b-cart" onclick="show('cart')">🛒<br>Cart</div><div id="b-orders" onclick="show('orders')">📦<br>Orders</div><div id="b-account" onclick="show('account')">👤<br>Dashboard</div></div>
 <script>
-let all=[],cart=[],myOrders=JSON.parse(localStorage.getItem('my_orders')||'[]'),activeCat='All',adminPass='';
+let all=[],cart=[],wishlist=JSON.parse(localStorage.getItem('lonma_wish')||'[]'),myOrders=JSON.parse(localStorage.getItem('my_orders')||'[]'),activeCat='All',adminPass='',adminData=null,promoDiscount=0,promoCode='',feedCache=[];
 try{let s=localStorage.getItem('lonma_cart');if(s)cart=JSON.parse(s);}catch(e){cart=[];}
 function save(){localStorage.setItem('lonma_cart',JSON.stringify(cart));updateCount();}
-function updateCount(){let c=0;for(let i of cart)c+=i.qty;let el=document.getElementById('cartCount');if(el){el.innerText=c;el.style.display=c>0?'flex':'none';}document.getElementById('mc').innerText=c;}
+function saveWish(){localStorage.setItem('lonma_wish',JSON.stringify(wishlist));updateCount();}
+function updateCount(){let c=0;for(let i of cart)c+=i.qty;let el=document.getElementById('cartCount');if(el){el.innerText=c;el.style.display=c>0?'flex':'none';}document.getElementById('mc').innerText=c;document.getElementById('wishCount').innerText=wishlist.length;document.getElementById('mcWish').innerText=wishlist.length;}
 function openMenu(){document.getElementById('side').classList.add('open');document.getElementById('overlay').classList.add('open');}
 function closeMenu(){document.getElementById('side').classList.remove('open');document.getElementById('overlay').classList.remove('open');}
+function openWA(){let msg=encodeURIComponent('Hi LONMA ORBIT! I want to order.');window.open('https://wa.me/254700000000?text='+msg,'_blank');}
+function orderViaWA(){let txt='Hi LONMA! I want to order:\\n';for(let i of cart)txt+=i.name+' x'+i.qty+' = KSh '+(i.price*i.qty)+'\\n';txt+='Total: KSh '+document.getElementById('tot').innerText;window.open('https://wa.me/254700000000?text='+encodeURIComponent(txt),'_blank');}
+function getUser(){try{return JSON.parse(localStorage.getItem('lonma_user')||'null');}catch(e){return null;}}
+function formatText(t){return t.replace(/#(\\w+)/g,'<span class="hashtag">#$1</span>');}
+function avatarLetter(name){return (name||'L').charAt(0).toUpperCase();}
+// ===== COMMUNITY =====
+async function loadCommunity(){
+  let u=getUser(); let phone=u?u.phone:'';
+  let r=await fetch('/api/community/posts?phone='+encodeURIComponent(phone)); feedCache=await r.json();
+  let tr=await fetch('/api/community/trending'); let trends=await tr.json();
+  document.getElementById('trendingList').innerHTML=trends.map(t=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9"><b>${t.tag}</b><span style="color:#64748b;font-size:12px">${t.count} posts</span></div>`).join('');
+  document.getElementById('myAvatar').innerText=u?avatarLetter(u.name):'?';
+  renderFeed();
+}
+function renderFeed(){
+  document.getElementById('feed').innerHTML=feedCache.map(p=>{
+    let imgHtml='';
+    if(p.image){let parts=p.image.split('|'); imgHtml=`<div style="background:${parts[1]||'#f1f5f9'};border-radius:14px;font-size:40px;text-align:center;padding:14px;margin-top:10px">${parts[0]}</div>`;}
+    return `<div class="card" style="display:block;padding:14px"><div style="display:flex;gap:10px"><div class="avatar">${avatarLetter(p.author)}</div><div style="flex:1"><div style="display:flex;gap:6px;align-items:center"><b style="font-size:14px">${p.author}</b><span style="font-size:11px;color:#94a3b8">${p.created}</span></div><div style="font-size:14px;line-height:1.5;margin-top:4px">${formatText(p.text)}</div>${imgHtml}<div class="tweet-actions"><span onclick="likePost(${p.id})">${p.liked?'❤️':'🤍'} ${p.likes}</span><span onclick="toggleComments(${p.id})">💬 ${p.comments}</span><span onclick="repostPost(${p.id})">🔁 ${p.reposts}</span><span onclick="sharePost(${p.id})">📤 Share</span><span onclick="shopFromPost('${p.text.replace(/'/g,'')}')">🛒 Shop</span></div><div id="comments-${p.id}" style="display:none;margin-top:10px"></div><div id="commentBox-${p.id}" style="display:none;margin-top:10px"><input id="cInput-${p.id}" placeholder="Write a comment..."><button class="btn btn-teal" style="padding:10px" onclick="sendComment(${p.id})">Reply</button></div></div></div></div>`;
+  }).join('')||'No posts yet. Be first!';
+}
+async function createPost(){
+  let u=getUser(); if(!u){alert('Please Sign In first to post!'); show('account'); return;}
+  let txt=document.getElementById('postText').value.trim(); if(!txt)return;
+  await fetch('/api/community/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({author:u.name,phone:u.phone,text:txt})});
+  document.getElementById('postText').value=''; loadCommunity();
+}
+async function likePost(id){
+  let u=getUser(); let phone=u?u.phone:'guest-'+Math.random();
+  await fetch('/api/community/like',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({post_id:id,phone})}); loadCommunity();
+}
+async function repostPost(id){ await fetch('/api/community/repost',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({post_id:id})}); loadCommunity();}
+async function toggleComments(id){
+  let box=document.getElementById('commentBox-'+id); let list=document.getElementById('comments-'+id);
+  let showBox=box.style.display==='none'; box.style.display=showBox?'block':'none'; list.style.display=showBox?'block':'none';
+  if(showBox){ let r=await fetch('/api/community/comments/'+id); let cs=await r.json(); list.innerHTML=cs.map(c=>`<div style="background:#f8fafc;padding:8px 10px;border-radius:10px;margin:4px 0"><b style="font-size:12px">${c.author}</b> <span style="font-size:12px">${c.text}</span></div>`).join('')||'<div style="font-size:12px;color:#94a3b8">No comments yet</div>';}
+}
+async function sendComment(id){
+  let u=getUser(); if(!u){alert('Sign in to comment'); show('account'); return;}
+  let txt=document.getElementById('cInput-'+id).value.trim(); if(!txt)return;
+  await fetch('/api/community/comment',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({post_id:id,author:u.name,text:txt})}); toggleComments(id); toggleComments(id); loadCommunity();
+}
+function sharePost(id){let p=feedCache.find(x=>x.id===id); if(!p)return; let url='https://app.lonmaorbit.co.ke'; if(navigator.share){navigator.share({title:'LONMA Community',text:p.text,url});} else {navigator.clipboard.writeText(p.text+' - '+url); alert('Copied!');}}
+function shopFromPost(text){show('products'); document.getElementById('searchInput').value=''; filterProducts();}
 function filterCat(cat,el){activeCat=cat;document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');filterProducts();}
-function filterProducts(){let q=document.getElementById('searchInput').value.toLowerCase();let sort=document.getElementById('sortSelect').value;let f=all.filter(p=>{let matchCat=activeCat==='All'||p.category===activeCat;let matchSearch=!q||p.name.toLowerCase().includes(q);return matchCat&&matchSearch;});if(sort==='low')f.sort((a,b)=>a.price-b.price);if(sort==='high')f.sort((a,b)=>b.price-a.price);if(sort==='name')f.sort((a,b)=>a.name.localeCompare(b.name));render(f);}
+function filterProducts(){let q=document.getElementById('searchInput').value.toLowerCase();let sort=document.getElementById('sortSelect').value;let f=all.filter(p=>{let matchCat=activeCat==='All'||p.category===activeCat;let matchSearch=!q||p.name.toLowerCase().includes(q);return matchCat&&matchSearch;});if(sort==='low')f.sort((a,b)=>a.price-b.price);if(sort==='high')f.sort((a,b)=>b.price-a.price);if(sort==='name')f.sort((a,b)=>a.name.localeCompare(b.name));if(sort==='rating')f.sort((a,b)=>b.rating-a.rating);render(f);}
 function parseImg(s){let parts=(s||'🧼|#f1f5f9').split('|');return {emoji:parts[0],bg:parts[1]||'#f1f5f9'};}
-function render(list){let h='';for(let p of list){let inC=cart.find(c=>c.id===p.id);let low=p.stock<=8?`<span style="color:#ef4444;font-size:10px;font-weight:800;background:#fef2f2;padding:3px 8px;border-radius:20px;margin-left:6px">Only ${p.stock} left!</span>`:'';let im=parseImg(p.image);h+=`<div class="card"><div class="pimg" style="background:${im.bg}">${im.emoji}</div><div style="flex:1"><div style="font-weight:700;font-size:13px;line-height:1.3">${p.name}${low}</div><div style="font-size:11px;color:#94a3b8;margin-top:4px">${p.category} • ${p.code}</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><b style="font-size:16px">KSh ${p.price}</b><button class="btn" style="width:auto;padding:8px 18px;border-radius:20px;font-size:12px" onclick="add(${p.id})">${inC?'✓ '+inC.qty:'Add'}</button></div></div></div>`;}document.getElementById('plist').innerHTML=h||'<div class="card" style="display:block;text-align:center">No products found</div>';document.getElementById('pCount').innerText=list.length+' items';}
+function stars(r){return '⭐'.repeat(Math.round(r))+' '+r;}
+function render(list){let h='';for(let p of list){let inC=cart.find(c=>c.id===p.id);let isWish=wishlist.includes(p.id);let low=p.stock<=8?`<span style="color:#ef4444;font-size:10px;font-weight:800;background:#fef2f2;padding:3px 8px;border-radius:20px;margin-left:6px">Only ${p.stock} left!</span>`:'';let im=parseImg(p.image);h+=`<div class="card"><div class="pimg" style="background:${im.bg};cursor:pointer" onclick="openDetail(${p.id})">${im.emoji}</div><div style="flex:1"><div style="display:flex;justify-content:space-between"><div style="font-weight:700;font-size:13px;line-height:1.3;cursor:pointer" onclick="openDetail(${p.id})">${p.name}${low}</div><span style="cursor:pointer;font-size:18px" onclick="toggleWish(${p.id})">${isWish?'❤️':'🤍'}</span></div><div style="font-size:11px;color:#f59e0b">${stars(p.rating)} (${p.reviews})</div><div style="font-size:11px;color:#94a3b8;margin-top:2px">${p.category} • ${p.code}</div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><b style="font-size:16px">KSh ${p.price}</b><button class="btn" style="width:auto;padding:8px 18px;border-radius:20px;font-size:12px" onclick="add(${p.id})">${inC?'✓ '+inC.qty:'Add'}</button></div></div></div>`;}document.getElementById('plist').innerHTML=h||'<div class="card" style="display:block;text-align:center">No products found</div>';document.getElementById('pCount').innerText=list.length+' items';}
+function toggleWish(id){if(wishlist.includes(id))wishlist=wishlist.filter(x=>x!==id);else wishlist.push(id);saveWish();filterProducts();renderWishlist();}
+function renderWishlist(){let list=all.filter(p=>wishlist.includes(p.id));document.getElementById('wishList').innerHTML=list.length?list.map(p=>{let im=parseImg(p.image);return `<div class="card"><div class="pimg" style="background:${im.bg}">${im.emoji}</div><div style="flex:1"><b style="font-size:13px">${p.name}</b><div>KSh ${p.price}</div><button class="btn" style="width:auto;padding:8px 18px;margin-top:8px" onclick="add(${p.id});show('cart')">Add to Cart</button></div></div>`}).join(''):'<div class="card" style="display:block;text-align:center">No wishlist yet. Tap 🤍 on products</div>';}
+async function openDetail(id){let p=all.find(x=>x.id===id);let im=parseImg(p.image);let r=await fetch('/api/reviews/'+id);let revs=await r.json();document.getElementById('detailContent').innerHTML=`<div class="card" style="display:block;text-align:center;padding:20px"><div style="background:${im.bg};border-radius:16px;font-size:70px;padding:20px">${im.emoji}</div><h3>${p.name}</h3><div style="color:#f59e0b">${stars(p.rating)} (${p.reviews} reviews)</div><p style="color:#64748b">${p.category} • ${p.code} • Stock: ${p.stock}</p><h2>KSh ${p.price}</h2><div style="display:flex;gap:8px"><button class="btn" onclick="add(${id})">Add to Cart</button><button class="btn" style="background:#fff;color:#000;border:1px solid #e2e8f0" onclick="toggleWish(${id})">❤️ Wishlist</button></div><button class="btn" style="background:#000;margin-top:8px" onclick="shareToCommunity(${id})">Share to Community 𝕏</button></div><div class="card" style="display:block"><h4>Reviews</h4><div id="revList">${revs.map(x=>`<div style="border-bottom:1px solid #f1f5f9;padding:8px 0"><b>${x.name}</b> ${'⭐'.repeat(x.rating)}<div style="font-size:13px">${x.text}</div></div>`).join('')||'No reviews yet'}</div><input id="revName" placeholder="Your name"><select id="revRating"><option value="5">⭐⭐⭐⭐⭐ 5</option><option value="4">⭐⭐⭐⭐ 4</option><option value="3">⭐⭐⭐ 3</option></select><input id="revText" placeholder="Write review..."><button class="btn btn-teal" onclick="submitReview(${id})">Submit Review</button></div>`;show('productDetail');}
+async function shareToCommunity(id){let p=all.find(x=>x.id===id);let u=getUser();if(!u){alert('Sign in first');show('account');return;}await fetch('/api/community/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({author:u.name,phone:u.phone,text:'Just bought '+p.name+' for KSh '+p.price+'! 🔥 Who else has tried it? #LONMA #'+p.category.replace(' ','')})});show('community');loadCommunity();}
+async function submitReview(id){let name=document.getElementById('revName').value||'Customer';let rating=document.getElementById('revRating').value;let text=document.getElementById('revText').value;await fetch('/api/reviews/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:id,name,rating,text})});openDetail(id);}
 function add(id){let p=all.find(x=>x.id===id);let f=cart.find(c=>c.id===id);if(f)f.qty++;else cart.push({id:p.id,name:p.name,price:p.price,image:p.image,qty:1});save();filterProducts();}
-function renderCart(){let cont=document.getElementById('cartItems'),sum=document.getElementById('cartSum'),empty=document.getElementById('emptyCart');if(cart.length===0){cont.innerHTML='';sum.style.display='none';empty.style.display='block';return;}empty.style.display='none';sum.style.display='block';let sub=0,items=0,html='';for(let it of cart){sub+=it.price*it.qty;items+=it.qty;let im=parseImg(it.image);html+=`<div class="card"><div class="pimg" style="width:60px;height:60px;font-size:24px;background:${im.bg}">${im.emoji}</div><div style="flex:1"><b style="font-size:13px">${it.name}</b><div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button onclick="chg(${it.id},-1)" style="width:28px;height:28px;border-radius:50%;border:1px solid #e2e8f0;background:#fff">-</button><span>${it.qty}</span><button onclick="chg(${it.id},1)" style="width:28px;height:28px;border-radius:50%;border:1px solid #e2e8f0;background:#fff">+</button><span style="margin-left:auto;font-weight:800">KSh ${it.price*it.qty}</span></div></div></div>`;}cont.innerHTML=html;let area=document.getElementById('area').value;let del=area==='CBD'?150:area==='Upcountry'?350:200;if(sub>=2000)del=0;let tot=sub+del;document.getElementById('sub').innerText=sub;document.getElementById('tItems').innerText=items;document.getElementById('delFee').innerText=del==0?'FREE':'KSh '+del;document.getElementById('tot').innerText=tot;document.getElementById('pay').innerText=tot;}
+async function applyPromo(){let code=document.getElementById('promoCode').value.trim();let r=await fetch('/api/promo/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});let d=await r.json();if(d.valid){promoDiscount=d.discount;promoCode=code;document.getElementById('promoMsg').innerText='✅ '+d.discount+'% OFF applied ('+code+')';}else{promoDiscount=0;document.getElementById('promoMsg').innerText='❌ Invalid code';}renderCart();}
+function calcTotals(){let sub=0;for(let i of cart)sub+=i.price*i.qty;let disc=Math.round(sub*promoDiscount/100);let area=document.getElementById('area').value;let del=area==='CBD'?150:area==='Upcountry'?350:200;if(sub-disc>=2000)del=0;if(promoCode==='FREEDEL')del=0;let tot=sub-disc+del;return {sub,disc,del,tot};}
+function renderCart(){let cont=document.getElementById('cartItems'),sum=document.getElementById('cartSum'),empty=document.getElementById('emptyCart');if(cart.length===0){cont.innerHTML='';sum.style.display='none';empty.style.display='block';return;}empty.style.display='none';sum.style.display='block';let html='';for(let it of cart){let im=parseImg(it.image);html+=`<div class="card"><div class="pimg" style="width:60px;height:60px;font-size:24px;background:${im.bg}">${im.emoji}</div><div style="flex:1"><b style="font-size:13px">${it.name}</b><div style="display:flex;gap:8px;align-items:center;margin-top:6px"><button onclick="chg(${it.id},-1)" style="width:28px;height:28px;border-radius:50%;border:1px solid #e2e8f0;background:#fff">-</button><span>${it.qty}</span><button onclick="chg(${it.id},1)" style="width:28px;height:28px;border-radius:50%;border:1px solid #e2e8f0;background:#fff">+</button><span style="margin-left:auto;font-weight:800">KSh ${it.price*it.qty}</span></div></div></div>`;}cont.innerHTML=html;let t=calcTotals();document.getElementById('sub').innerText=t.sub;document.getElementById('discFee').innerText='- KSh '+t.disc;document.getElementById('tItems').innerText=cart.reduce((a,b)=>a+b.qty,0);document.getElementById('delFee').innerText=t.del==0?'FREE':'KSh '+t.del;document.getElementById('tot').innerText=t.tot;document.getElementById('pay').innerText=t.tot;}
 function chg(id,d){let f=cart.find(c=>c.id===id);if(!f)return;f.qty+=d;if(f.qty<=0)cart=cart.filter(c=>c.id!==id);save();renderCart();}
-function show(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.bottom div').forEach(b=>b.classList.remove('active'));let btn=document.getElementById('b-'+id);if(btn)btn.classList.add('active');if(id==='cart')renderCart();closeMenu();window.scrollTo(0,0);}
-async function loadP(){let r=await fetch('/api/products');all=await r.json();render(all);}
+function show(id){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById(id).classList.add('active');document.querySelectorAll('.bottom div').forEach(b=>b.classList.remove('active'));let btn=document.getElementById('b-'+id);if(btn)btn.classList.add('active');if(id==='cart')renderCart();if(id==='account')loadCustomerDashboard();if(id==='wishlist')renderWishlist();if(id==='community')loadCommunity();closeMenu();window.scrollTo(0,0);}
+async function loadP(){let r=await fetch('/api/products');all=await r.json();render(all);renderWishlist();}
 async function verify(){let c=document.getElementById('vcode').value.trim();let r=await fetch('/api/verify/'+c);let d=await r.json();document.getElementById('vres').innerText=d.valid?'✅ Authentic: '+d.product.name:'❌ Invalid Code';}
-async function checkout(){let name=document.getElementById('custName').value.trim(),phone=document.getElementById('phone').value.trim(),area=document.getElementById('area').value,loc=document.getElementById('loc').value.trim();if(!name||!phone||!area||!loc||!document.getElementById('agree').checked){document.getElementById('ps').innerText='Fill all fields + agree to Terms';return;}let sub=0;for(let i of cart)sub+=i.price*i.qty;let del=area==='CBD'?150:area==='Upcountry'?350:200;if(sub>=2000)del=0;let tot=sub+del;document.getElementById('ps').innerText='Sending M-Pesa prompt...';let r=await fetch('/mpesa/stkpush',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,amount:tot,cart,name,area,location:loc})});let d=await r.json();document.getElementById('ps').innerText=d.message;if(d.status==='ok'){myOrders.unshift({order_no:d.order_no,total:tot,status:'Pending',created:new Date().toLocaleString()});localStorage.setItem('my_orders',JSON.stringify(myOrders));document.getElementById('rcont').innerHTML=`<div style="font-size:50px">✅</div><h3>${d.order_no}</h3><p>Total KSh ${tot}</p><p style="font-size:12px;color:#64748b">Check phone for M-Pesa prompt</p>`;cart=[];localStorage.removeItem('lonma_cart');save();show('receipt');}}
+async function trackOrder(){let no=document.getElementById('trackNo').value.trim();let r=await fetch('/api/track/'+no);let d=await r.json();if(!d.found){document.getElementById('trackRes').innerHTML='❌ Order not found';return;}document.getElementById('trackRes').innerHTML=`<b>${d.order_no}</b> • KSh ${d.total} • ${d.status}<div class="progress" style="margin-top:10px"><div style="width:${d.progress}%"></div></div><div style="display:flex;justify-content:space-between;font-size:11px;margin-top:6px"><span>Pending</span><span>Paid</span><span>Shipped</span><span>Delivered</span></div>`;}
+async function checkout(){let name=document.getElementById('custName').value.trim(),phone=document.getElementById('phone').value.trim(),area=document.getElementById('area').value,loc=document.getElementById('loc').value.trim();if(!name||!phone||!area||!loc||!document.getElementById('agree').checked){document.getElementById('ps').innerText='Fill all fields + agree to Terms';return;}let t=calcTotals();document.getElementById('ps').innerText='Sending M-Pesa prompt...';let r=await fetch('/mpesa/stkpush',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,amount:t.tot,cart,name,area,location:loc})});let d=await r.json();document.getElementById('ps').innerText=d.message;if(d.status==='ok'){myOrders.unshift({order_no:d.order_no,total:t.tot,status:'Pending',created:new Date().toLocaleString()});localStorage.setItem('my_orders',JSON.stringify(myOrders));document.getElementById('rcont').innerHTML=`<div style="font-size:50px">✅</div><h3>${d.order_no}</h3><p>Total KSh ${t.tot} ${promoDiscount?'('+promoDiscount+'% OFF)':''}</p><p style="font-size:12px;color:#64748b">Check phone for M-Pesa prompt</p><button class="btn" style="margin-top:12px" onclick="document.getElementById('trackNo').value='${d.order_no}';show('track');trackOrder()">Track This Order →</button>`;cart=[];promoDiscount=0;localStorage.removeItem('lonma_cart');save();show('receipt');}}
 async function loadOrders(){let ph=document.getElementById('phLookup').value.trim();let r=await fetch('/api/orders?phone='+ph);let data=await r.json();document.getElementById('olist').innerHTML=data.map(o=>`<div class="card" style="display:block"><div style="display:flex;justify-content:space-between"><b>${o.order_no}</b><span style="background:#f1f5f9;padding:4px 10px;border-radius:20px;font-size:11px">${o.status}</span></div><div style="margin-top:6px">KSh ${o.total} • ${o.created}</div></div>`).join('');document.getElementById('noOrd').style.display=data.length?'none':'block';}
-async function adminLogin(){let p=document.getElementById('apass').value;let r=await fetch('/api/admin/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})});let d=await r.json();document.getElementById('ast').innerText=d.message||'';if(d.status==='ok'){adminPass=p;document.getElementById('acont').style.display='block';let r2=await fetch('/api/admin/orders?password='+encodeURIComponent(p));let orders=await r2.json();document.getElementById('alist').innerHTML=orders.map(o=>`<div class="card" style="display:block"><b>${o.order_no}</b> ${o.phone} - KSh ${o.total} - ${o.status}</div>`).join('')||'No orders';}}
-async function register(){let name=document.getElementById('rn').value.trim(),phone=document.getElementById('rp').value.trim(),pass=document.getElementById('rpass').value.trim();let r=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,password:pass})});let d=await r.json();document.getElementById('rs').innerText=d.status==='ok'?'Created':'Error';if(d.status==='ok'){localStorage.setItem('lonma_user',JSON.stringify(d.user));show('products');}}
-async function login(){let phone=document.getElementById('lp').value.trim(),pass=document.getElementById('lpass').value.trim();let r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,password:pass})});let d=await r.json();document.getElementById('ls').innerText=d.status==='ok'?'Welcome':'Wrong';if(d.status==='ok'){localStorage.setItem('lonma_user',JSON.stringify(d.user));show('products');}}
-function logout(){localStorage.removeItem('lonma_user');show('account');}
+function switchAdminTab(tab,el){document.querySelectorAll('.dtab').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.getElementById('aOrdersList').style.display=tab==='orders'?'block':'none';document.getElementById('aCustList').style.display=tab==='customers'?'block':'none';document.getElementById('aStockList').style.display=tab==='stock'?'block':'none';document.getElementById('aAdd').style.display=tab==='add'?'block':'none';}
+async function adminLogin(){let p=document.getElementById('apass').value;let r=await fetch('/api/admin/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:p})});let d=await r.json();document.getElementById('ast').innerText=d.message||'';if(d.status==='ok'){adminPass=p;document.getElementById('adminLoginBox').style.display='none';document.getElementById('acont').style.display='block';let r2=await fetch('/api/admin/dashboard?password='+encodeURIComponent(p));adminData=await r2.json();document.getElementById('aSales').innerText='KSh '+adminData.total_sales;document.getElementById('aOrders').innerText=adminData.total_orders;document.getElementById('aCust').innerText=adminData.total_customers;document.getElementById('aProd').innerText=adminData.total_products;document.getElementById('aPosts').innerText=adminData.total_posts;document.getElementById('aOrdersList').innerHTML=adminData.orders.map(o=>`<div class="card" style="display:block"><div style="display:flex;justify-content:space-between"><b>${o.order_no}</b><select onchange="changeStatus('${o.order_no}',this.value)" style="width:auto;padding:6px;margin:0;font-size:11px"><option ${o.status==='Pending'?'selected':''}>Pending</option><option ${o.status==='PAID'?'selected':''}>PAID</option><option ${o.status==='Shipped'?'selected':''}>Shipped</option><option ${o.status==='Delivered'?'selected':''}>Delivered</option></select></div><div style="font-size:12px;margin-top:6px">${o.name} • ${o.phone}<br>KSh ${o.total} • ${o.created}</div></div>`).join('')||'No orders';document.getElementById('aCustList').innerHTML=adminData.customers.map(c=>`<div class="card" style="display:block"><b>${c.name}</b><div style="font-size:12px;color:#64748b">${c.phone} • ${c.orders} orders • Spent KSh ${c.spent}</div></div>`).join('')||'No customers';document.getElementById('aStockList').innerHTML=adminData.products.map(p=>`<div class="card" style="display:block"><div style="display:flex;justify-content:space-between"><b style="font-size:13px">${p.name}</b><span style="font-weight:800;color:${p.stock<=8?'#ef4444':'#16a34a'}">${p.stock} left</span></div><div style="font-size:12px;color:#64748b">${p.category} • KSh ${p.price}</div><button style="margin-top:8px;background:#fee2e2;border:none;padding:6px 12px;border-radius:10px;font-size:11px" onclick="deleteProduct(${p.id})">🗑 Delete</button></div>`).join('');}}
+async function changeStatus(order_no,status){await fetch('/api/admin/update_status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:adminPass,order_no,status})});}
+async function addProduct(){let name=document.getElementById('npName').value,price=document.getElementById('npPrice').value,code=document.getElementById('npCode').value,cat=document.getElementById('npCat').value,stock=document.getElementById('npStock').value;let r=await fetch('/api/admin/add_product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:adminPass,name,price,code,category:cat,stock})});let d=await r.json();document.getElementById('npMsg').innerText=d.status==='ok'?'✅ Added! Refresh page':'Error';if(d.status==='ok')loadP();}
+async function deleteProduct(id){if(!confirm('Delete?'))return;await fetch('/api/admin/delete_product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:adminPass,id})});adminLogin();}
+async function loadCustomerDashboard(){let u=getUser();if(!u){document.getElementById('out').style.display='block';document.getElementById('in').style.display='none';return;}document.getElementById('out').style.display='none';document.getElementById('in').style.display='block';document.getElementById('an').innerText='Welcome, '+u.name;document.getElementById('ap').innerText=u.phone;let r=await fetch('/api/customer/dashboard?phone='+encodeURIComponent(u.phone));let d=await r.json();document.getElementById('cOrders').innerText=d.total_orders;document.getElementById('cSpent').innerText='KSh '+d.total_spent;document.getElementById('cPoints').innerText=d.points;document.getElementById('cPhone').innerText=d.phone;document.getElementById('cList').innerHTML=d.orders.map(o=>`<div class="card" style="display:block"><div style="display:flex;justify-content:space-between"><b>${o.order_no}</b><span style="background:#f1f5f9;padding:4px 10px;border-radius:20px;font-size:11px">${o.status}</span></div><div style="margin-top:6px">KSh ${o.total} • ${o.created}</div></div>`).join('')||'<div class="card" style="display:block;text-align:center">No orders yet</div>';}
+async function register(){let name=document.getElementById('rn').value.trim(),phone=document.getElementById('rp').value.trim(),pass=document.getElementById('rpass').value.trim();let r=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,password:pass})});let d=await r.json();document.getElementById('rs').innerText=d.status==='ok'?'Created':'Error';if(d.status==='ok'){localStorage.setItem('lonma_user',JSON.stringify(d.user));loadCustomerDashboard();}}
+async function login(){let phone=document.getElementById('lp').value.trim(),pass=document.getElementById('lpass').value.trim();let r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,password:pass})});let d=await r.json();document.getElementById('ls').innerText=d.status==='ok'?'Welcome':'Wrong';if(d.status==='ok'){localStorage.setItem('lonma_user',JSON.stringify(d.user));loadCustomerDashboard();}}
+function logout(){localStorage.removeItem('lonma_user');document.getElementById('out').style.display='block';document.getElementById('in').style.display='none';}
 document.getElementById('area')?.addEventListener('change',renderCart);
-loadP();updateCount();
+loadP();updateCount();loadCustomerDashboard();
 </script></body></html>
 """
 
