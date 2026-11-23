@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os, sqlite3, json, datetime, requests, base64, time, re, random, hashlib, hmac, secrets
@@ -6,18 +6,48 @@ from threading import Thread
 from collections import defaultdict
 
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# SECURITY: Only your domains can call API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://app.lonmaorbit.co.ke", "https://lonmaorbit.co.ke"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
-DARAJA_KEY = os.getenv("DARAJA_KEY",""); DARAJA_SECRET=os.getenv("DARAJA_SECRET","")
-DARAJA_SHORTCODE=os.getenv("DARAJA_SHORTCODE","174379"); DARAJA_PASSKEY=os.getenv("DARAJA_PASSKEY","")
-DARAJA_CALLBACK=os.getenv("CALLBACK_URL","https://app.lonmaorbit.co.ke/mpesa/callback")
-USE_PROD=os.getenv("DARAJA_ENV","sandbox")=="production"
-AIRTEL_KEY=os.getenv("AIRTEL_KEY",""); AIRTEL_SECRET=os.getenv("AIRTEL_SECRET","")
-STRIPE_KEY=os.getenv("STRIPE_KEY","")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD","Lonma#2026!Secure")
-# SMS - Africa's Talking / Twilio - set in Render Env
-SMS_API_KEY=os.getenv("SMS_API_KEY",""); SMS_USERNAME=os.getenv("SMS_USERNAME",""); SMS_SENDER=os.getenv("SMS_SENDER","LONMA")
-SHOW_RESET_CODE=os.getenv("SHOW_RESET_CODE","false").lower()=="true"  # ONLY for testing, keep false in production
+# --- SECURITY: NO secrets in code ---
+DARAJA_KEY = os.getenv("DARAJA_KEY", "")
+DARAJA_SECRET = os.getenv("DARAJA_SECRET", "")
+DARAJA_SHORTCODE = os.getenv("DARAJA_SHORTCODE", "") # No 174379 default
+DARAJA_PASSKEY = os.getenv("DARAJA_PASSKEY", "")
+DARAJA_CALLBACK = os.getenv("CALLBACK_URL", "https://app.lonmaorbit.co.ke/mpesa/callback")
+USE_PROD = os.getenv("DARAJA_ENV", "sandbox") == "production"
+
+AIRTEL_KEY = os.getenv("AIRTEL_KEY", ""); AIRTEL_SECRET = os.getenv("AIRTEL_SECRET", "")
+STRIPE_KEY = os.getenv("STRIPE_KEY", "")
+
+# --- ADMIN ONLY: marlonkikuyu@gmail.com ---
+ADMIN_EMAIL = "marlonkikuyu@gmail.com"
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "") # MUST be set in Render, NO default
+
+SMS_API_KEY = os.getenv("SMS_API_KEY", ""); SMS_USERNAME = os.getenv("SMS_USERNAME", ""); SMS_SENDER = os.getenv("SMS_SENDER", "LONMA")
+SHOW_RESET_CODE = os.getenv("SHOW_RESET_CODE", "false").lower() == "true" # Keep false in production
+
+# --- AUDIT LOG + ADMIN CHECK ---
+def audit_log(action, user_email, details):
+    entry = f"{datetime.datetime.now()} | {action} | by={user_email} | {details}\n"
+    try:
+        with open("audit.log", "a") as f:
+            f.write(entry)
+    except:
+        pass
+    print(f"[AUDIT] {entry}")
+
+def require_admin(user_email: str):
+    if user_email != ADMIN_EMAIL:
+        audit_log("BLOCKED_CHANGE", user_email or "unknown", "Tried to make admin change")
+        raise HTTPException(status_code=403, detail="Only Admin can make changes")
+    return True
+    ep false in production
 
 # --- PASSWORD HASHING ---
 def hash_pw(pw: str):
