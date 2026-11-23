@@ -732,3 +732,20 @@ def keep_alive():
         try: requests.get("https://app.lonmaorbit.co.ke",timeout=5)
         except: pass
 Thread(target=keep_alive, daemon=True).start()
+# ALIASES - login.html calls /api/register and /api/login, also support them
+@app.post("/api/register")
+async def reg_alias(req: Request):
+    return await reg(req)
+
+@app.post("/api/login")
+async def log_alias(req: Request):
+    return await log(req)
+
+# Also support /api/auth/* without /auth for old frontend
+@app.post("/api/signup")
+async def signup_alias(req: Request):
+    return await reg(req)
+
+@app.post("/api/signin")
+async def signin_alias(req: Request):
+    return await log(req)
