@@ -1,5 +1,5 @@
 <body>
-<script>
+  <script>
 async function forceCheck(){
   const token = localStorage.getItem('token');
   if(!token){ window.location.href='/login.html'; return; }
@@ -7,7 +7,7 @@ async function forceCheck(){
   if(!r.ok){ localStorage.clear(); window.location.href='/login.html'; }
 }
 forceCheck();
-function logout(){
+</script>
   fetch('/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+localStorage.getItem('token')}});
   localStorage.clear();
   window.location.href='/login.html';
