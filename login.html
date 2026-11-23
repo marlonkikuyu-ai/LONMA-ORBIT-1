@@ -26,7 +26,6 @@ button{width:100%;padding:12px;margin:8px 0;border:none;border-radius:8px;font-w
 <input id="email" placeholder="Your Email" type="email">
 <input id="password" placeholder="Your Password (8+ chars)" type="password">
 <button class="login" id="mainBtn" onclick="submitAuth()">Log In</button>
-<button onclick="location.href='/'">Back to Home</button>
 </div>
 <script>
 let mode='login';
@@ -37,20 +36,24 @@ function show(m){mode=m;
  document.getElementById('mainBtn').innerText=m=='login'?'Log In':'Create My Account';
 }
 async function submitAuth(){
- const email=document.getElementById('email').value.trim();
+ const email=document.getElementById('email').value.trim().toLowerCase();
  const password=document.getElementById('password').value;
  const name=document.getElementById('name').value.trim();
+ if(!email || !password){document.getElementById('msg').innerText='Enter email + password';return;}
+ if(mode=='signup' && !name){document.getElementById('msg').innerText='Enter your full name';return;}
  const url=mode=='login'?'/api/auth/login':'/api/auth/signup';
  const body=mode=='login'?{email,password}:{email,password,name};
  document.getElementById('msg').innerText='Please wait...';
- const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
- const d=await r.json();
- if(!r.ok){document.getElementById('msg').innerText=d.detail||'Failed';return;}
- if(mode=='signup'){document.getElementById('msg').innerText='Account created! Now Log In.';show('login');return;}
- localStorage.setItem('token',d.token);
- localStorage.setItem('email',d.email);
- localStorage.setItem('role',d.role);
- document.getElementById('msg').innerText='Welcome '+d.name;
- setTimeout(()=>location.href='/',800);
+ try{
+  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await r.json();
+  if(!r.ok){document.getElementById('msg').innerText=d.detail||'Failed';return;}
+  // FIX: Both login + signup return token - save it and go home
+  localStorage.setItem('token',d.token);
+  localStorage.setItem('email',d.email);
+  localStorage.setItem('name',d.name||name||'');
+  document.getElementById('msg').innerText='Welcome '+(d.name||name);
+  setTimeout(()=>location.href='/',800);
+ }catch(e){document.getElementById('msg').innerText='Network error - try again';}
 }
 </script></body></html>
