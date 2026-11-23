@@ -7,7 +7,6 @@ body{font-family:sans-serif;background:#0f172a;color:white;display:flex;justify-
 input{width:100%;padding:12px;margin:8px 0;border-radius:8px;border:none;box-sizing:border-box}
 button{width:100%;padding:12px;margin:8px 0;border:none;border-radius:8px;font-weight:bold;cursor:pointer}
 .login{background:#22c55e;color:white}
-.signup{background:white;color:#0f172a}
 #msg{color:#facc15;text-align:center;margin:10px 0}
 .tabs{display:flex;gap:10px}
 .tabs button{flex:1;background:#334155;color:white}
@@ -16,16 +15,17 @@ button{width:100%;padding:12px;margin:8px 0;border:none;border-radius:8px;font-w
 <body>
 <div class="box">
 <img src="/logo.png" style="width:80px;display:block;margin:0 auto">
-<h2 style="text-align:center">Lonma Orbit</h2>
+<h2 style="text-align:center">LONMA ORBIT</h2>
 <div class="tabs">
-<button id="tabLogin" class="active" onclick="show('login')">Log In</button>
-<button id="tabSignup" onclick="show('signup')">Sign Up</button>
+<button id="tabLogin" class="active" onclick="show('login')">Sign In</button>
+<button id="tabSignup" onclick="show('signup')">Create Account</button>
 </div>
 <div id="msg"></div>
-<input id="name" placeholder="Full Name (Sign Up only)" style="display:none">
-<input id="email" placeholder="Your Email" type="email">
-<input id="password" placeholder="Your Password (8+ chars)" type="password">
-<button class="login" id="mainBtn" onclick="submitAuth()">Log In</button>
+<input id="name" placeholder="Full name" style="display:none">
+<input id="phone" placeholder="07xxxxxxxx" type="tel">
+<input id="password" placeholder="Password (min 4 chars)" type="password">
+<button class="login" id="mainBtn" onclick="submitAuth()">Sign In</button>
+<p style="font-size:12px;text-align:center;opacity:.7">By creating an account you agree to Terms & Conditions. Password is encrypted.</p>
 </div>
 <script>
 let mode='login';
@@ -33,27 +33,26 @@ function show(m){mode=m;
  document.getElementById('tabLogin').className=m=='login'?'active':'';
  document.getElementById('tabSignup').className=m=='signup'?'active':'';
  document.getElementById('name').style.display=m=='signup'?'block':'none';
- document.getElementById('mainBtn').innerText=m=='login'?'Log In':'Create My Account';
+ document.getElementById('mainBtn').innerText=m=='login'?'Sign In':'Create Account';
 }
 async function submitAuth(){
- const email=document.getElementById('email').value.trim().toLowerCase();
+ const phone=document.getElementById('phone').value.trim();
  const password=document.getElementById('password').value;
  const name=document.getElementById('name').value.trim();
- if(!email || !password){document.getElementById('msg').innerText='Enter email + password';return;}
- if(mode=='signup' && !name){document.getElementById('msg').innerText='Enter your full name';return;}
+ if(!phone||!password){document.getElementById('msg').innerText='Enter phone + password';return;}
+ if(mode=='signup'&&!name){document.getElementById('msg').innerText='Enter full name';return;}
  const url=mode=='login'?'/api/auth/login':'/api/auth/signup';
- const body=mode=='login'?{email,password}:{email,password,name};
+ const body=mode=='login'?{phone,password}:{phone,password,name};
  document.getElementById('msg').innerText='Please wait...';
  try{
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const d=await r.json();
   if(!r.ok){document.getElementById('msg').innerText=d.detail||'Failed';return;}
-  // FIX: Both login + signup return token - save it and go home
   localStorage.setItem('token',d.token);
-  localStorage.setItem('email',d.email);
+  localStorage.setItem('phone',d.phone||phone);
   localStorage.setItem('name',d.name||name||'');
   document.getElementById('msg').innerText='Welcome '+(d.name||name);
   setTimeout(()=>location.href='/',800);
- }catch(e){document.getElementById('msg').innerText='Network error - try again';}
+ }catch(e){document.getElementById('msg').innerText='Network error';}
 }
 </script></body></html>
