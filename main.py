@@ -47,7 +47,6 @@ def require_admin(user_email: str):
         audit_log("BLOCKED_CHANGE", user_email or "unknown", "Tried to make admin change")
         raise HTTPException(status_code=403, detail="Only Admin can make changes")
     return True
-    ep false in production
 
 # --- PASSWORD HASHING ---
 def hash_pw(pw: str):
