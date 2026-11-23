@@ -1,10 +1,15 @@
 <body>
+<style>body{visibility:hidden}</style>
 <script>
 async function forceCheck(){
   const token = localStorage.getItem('token');
   if(!token){ window.location.href='/login.html'; return; }
-  const r = await fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+token}});
-  if(!r.ok){ localStorage.clear(); window.location.href='/login.html'; }
+  try{
+    const r = await fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+token}});
+    if(!r.ok){ localStorage.clear(); window.location.href='/login.html'; return; }
+    // Logged in - show page
+    document.body.style.visibility='visible';
+  }catch(e){ localStorage.clear(); window.location.href='/login.html'; }
 }
 forceCheck();
 function logout(){
