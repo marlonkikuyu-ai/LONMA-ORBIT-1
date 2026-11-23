@@ -1,63 +1,103 @@
 <!DOCTYPE html>
-<html><head><title>Lonma Orbit - Login</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LONMA ORBIT - Login</title>
 <style>
-body{font-family:sans-serif;background:#0f172a;color:white;display:flex;justify-content:center;padding:20px}
-.box{background:#1e293b;padding:25px;border-radius:12px;width:100%;max-width:380px}
-input{width:100%;padding:12px;margin:8px 0;border-radius:8px;border:none;box-sizing:border-box}
-button{width:100%;padding:12px;margin:8px 0;border:none;border-radius:8px;font-weight:bold;cursor:pointer}
-.login{background:#22c55e;color:white}
-#msg{color:#facc15;text-align:center;margin:10px 0}
-.tabs{display:flex;gap:10px}
-.tabs button{flex:1;background:#334155;color:white}
-.tabs button.active{background:#22c55e}
-</style></head>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+body{background:#0b1220;color:white;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.card{background:#111a2e;width:100%;max-width:420px;padding:28px 24px;border-radius:18px;border:1px solid #1e293b}
+.logo{width:90px;height:90px;object-fit:cover;border-radius:50%;display:block;margin:0 auto;border:3px solid #22c55e;box-shadow:0 4px 15px rgba(0,0,0,.4);background:white}
+h1{text-align:center;font-size:22px;letter-spacing:2px;margin-top:12px}
+.sub{text-align:center;color:#94a3b8;font-size:13px;margin:6px 0 18px}
+.tabs{display:flex;background:#0b1220;border-radius:10px;padding:4px;margin-bottom:16px}
+.tabs button{flex:1;padding:10px;border:0;border-radius:8px;cursor:pointer;background:transparent;color:#94a3b8;font-weight:bold}
+.tabs button.active{background:#22c55e;color:white}
+label{font-size:13px;color:#cbd5e1;display:block;margin:12px 0 6px}
+input{width:100%;padding:12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:white;outline:none}
+input:focus{border-color:#22c55e}
+.btn{width:100%;padding:13px;margin-top:18px;border:0;border-radius:10px;background:#22c55e;color:white;font-weight:bold;font-size:15px;cursor:pointer}
+.msg{text-align:center;font-size:13px;margin-top:12px;min-height:18px}
+.msg.error{color:#f87171}.msg.success{color:#4ade80}
+</style>
+</head>
 <body>
-<div class="box">
-<img src="/logo.png" style="width:90px;height:90px;object-fit:cover;border-radius:50%;display:block;margin:0 auto;border:3px solid #22c55e;box-shadow:0 4px 15px rgba(0,0,0,0.4);background:white">
-<h2 style="text-align:center">LONMA ORBIT</h2>
+<div class="card">
+<img src="/logo.png" class="logo" alt="LONMA ORBIT">
+<h1>LONMA ORBIT</h1>
+<p class="sub">Quality Products, Delivered to You</p>
+
 <div class="tabs">
-<button id="tabLogin" class="active" onclick="show('login')">Sign In</button>
-<button id="tabSignup" onclick="show('signup')">Create Account</button>
+<button id="tabSignin" class="active" onclick="showTab('signin')">Sign In</button>
+<button id="tabSignup" onclick="showTab('signup')">Create Account</button>
 </div>
-<div id="msg"></div>
-<input id="name" placeholder="Full name" style="display:none">
-<input id="identifier" placeholder="Phone 07xxx OR Email" type="text">
-<input id="password" placeholder="Password (min 4 chars)" type="password">
-<button class="login" id="mainBtn" onclick="submitAuth()">Sign In</button>
-<p style="font-size:12px;text-align:center;opacity:.7">Use phone or email. By creating an account you agree to Terms & Conditions.</p>
+
+<!-- SIGN IN -->
+<div id="signinBox">
+<label>Email</label>
+<input id="loginEmail" type="email" placeholder="Enter your email">
+<label>Password</label>
+<input id="loginPassword" type="password" placeholder="Enter your password">
+<button class="btn" onclick="doLogin()">Sign In</button>
 </div>
+
+<!-- SIGN UP -->
+<div id="signupBox" style="display:none">
+<label>Full Name</label>
+<input id="regName" type="text" placeholder="Enter your full name">
+<label>Email</label>
+<input id="regEmail" type="email" placeholder="Enter your email">
+<label>Password</label>
+<input id="regPassword" type="password" placeholder="Create a password">
+<button class="btn" onclick="doRegister()">Create Account</button>
+</div>
+
+<div id="msg" class="msg"></div>
+</div>
+
 <script>
-let mode='login';
-function show(m){mode=m;
- document.getElementById('tabLogin').className=m=='login'?'active':'';
- document.getElementById('tabSignup').className=m=='signup'?'active':'';
- document.getElementById('name').style.display=m=='signup'?'block':'none';
- document.getElementById('mainBtn').innerText=m=='login'?'Sign In':'Create Account';
+function showTab(t){
+  document.getElementById('signinBox').style.display = t==='signin' ? 'block':'none';
+  document.getElementById('signupBox').style.display = t==='signup' ? 'block':'none';
+  document.getElementById('tabSignin').classList.toggle('active', t==='signin');
+  document.getElementById('tabSignup').classList.toggle('active', t==='signup');
+  document.getElementById('msg').textContent='';
 }
-async function submitAuth(){
- const identifier=document.getElementById('identifier').value.trim();
- const password=document.getElementById('password').value;
- const name=document.getElementById('name').value.trim();
- if(!identifier||!password){document.getElementById('msg').innerText='Enter phone/email + password';return;}
- if(mode=='signup'&&!name){document.getElementById('msg').innerText='Enter full name';return;}
- // Auto-detect: contains @ = email, else phone
- const isEmail = identifier.includes('@');
- const url=mode=='login'?'/api/auth/login':'/api/auth/signup';
- const body=mode=='login'
-   ? (isEmail ? {email:identifier,password} : {phone:identifier,password})
-   : (isEmail ? {email:identifier,password,name} : {phone:identifier,password,name});
- document.getElementById('msg').innerText='Please wait...';
- try{
-  const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const d=await r.json();
-  if(!r.ok){document.getElementById('msg').innerText=d.detail||'Failed';return;}
-  localStorage.setItem('token',d.token);
-  localStorage.setItem('name',d.name||name||'');
-  if(d.phone) localStorage.setItem('phone',d.phone);
-  if(d.email) localStorage.setItem('email',d.email);
-  document.getElementById('msg').innerText='Welcome '+(d.name||name);
-  setTimeout(()=>location.href='/',800);
- }catch(e){document.getElementById('msg').innerText='Network error';}
+function setMsg(text, ok){
+  const m=document.getElementById('msg');
+  m.textContent=text; m.className='msg '+(ok?'success':'error');
 }
-</script></body></html>
+function goInside(data, email){
+  localStorage.setItem('token', data.token || data.access_token || 'loggedin');
+  localStorage.setItem('user', JSON.stringify(data.user || {name:data.name, email:email}));
+  localStorage.setItem('lonma_user', email);
+  window.location.href='/home';
+}
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim().toLowerCase();
+  const password=document.getElementById('loginPassword').value;
+  if(!email||!password) return setMsg('Enter email and password', false);
+  try{
+    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const data=await r.json();
+    if(!r.ok || data.success===false) return setMsg(data.message||'Invalid email or password', false);
+    goInside(data, email);
+  }catch(e){ setMsg('Network error, try again', false); }
+}
+async function doRegister(){
+  const name=document.getElementById('regName').value.trim();
+  const email=document.getElementById('regEmail').value.trim().toLowerCase();
+  const password=document.getElementById('regPassword').value;
+  if(!name||!email||!password) return setMsg('Fill all fields', false);
+  try{
+    const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,password})});
+    const data=await r.json();
+    if(!r.ok || data.success===false) return setMsg(data.message||'Registration failed', false);
+    setMsg('Welcome '+data.name+'! Entering app...', true);
+    setTimeout(()=>goInside(data, email), 600);
+  }catch(e){ setMsg('Network error, try again', false); }
+}
+</script>
+</body>
+</html>
