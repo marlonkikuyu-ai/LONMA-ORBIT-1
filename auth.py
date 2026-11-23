@@ -1,115 +1,31 @@
-import sqlite3
-import hashlib
-import secrets
-from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 
-DB_PATH = "app.db"
-router = APIRouter()
-
-def get_db():
-    db = sqlite3.connect(DB_PATH)
-    db.row_factory = sqlite3.Row
-    return db
-
-def init_db():
-    db = get_db()
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            token TEXT PRIMARY KEY,
-            email TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    db.commit()
-    db.close()
-
-init_db()
-
-def hash_password(pw: str):
-    return hashlib.sha256(pw.encode()).hexdigest()
-
-def get_current_user(request: Request):
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Not logged in")
-    token = auth.replace("Bearer ", "").strip()
-    db = get_db()
-    row = db.execute("SELECT email FROM sessions WHERE token=?", (token,)).fetchone()
-    db.close()
-    if not row:
-        raise HTTPException(status_code=401, detail="Session expired - please login again")
-    return row["email"]
-
-class SignupIn(BaseModel):
+class Signup(BaseModel):
     name: str
-    email: str
     password: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
 
-class LoginIn(BaseModel):
-    email: str
+class Login(BaseModel):
     password: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
 
-@router.post("/api/auth/signup")
-async def signup(data: SignupIn):
-    db = get_db()
-    email = data.email.lower().strip()
-    existing = db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
-    if existing:
-        db.close()
-        raise HTTPException(status_code=400, detail="Email already registered")
-    db.execute("INSERT INTO users (name, email, password_hash) VALUES (?,?,?)",
-               (data.name, email, hash_password(data.password)))
-    token = secrets.token_hex(32)
-    db.execute("INSERT INTO sessions (token, email) VALUES (?,?)", (token, email))
-    db.commit(); db.close()
-    return {"ok": True, "token": token, "email": email, "name": data.name}
+def find_user(phone=None, email=None):
+    # Search users.json by phone OR email
+    for u in load_users():
+        if phone and u.get("phone") == phone:
+            return u
+        if email and u.get("email","").lower() == email.lower():
+            return u
+    return None
 
-@router.post("/api/auth/login")
-async def login(data: LoginIn):
-    db = get_db()
-    email = data.email.lower().strip()
-    user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
-    if not user or user["password_hash"] != hash_password(data.password):
-        db.close()
-        raise HTTPException(status_code=401, detail="Wrong email or password")
-    token = secrets.token_hex(32)
-    db.execute("INSERT INTO sessions (token, email) VALUES (?,?)", (token, email))
-    db.commit(); db.close()
-    return {"ok": True, "token": token, "email": email, "name": user["name"]}
+# In signup:
+# if not data.phone and not data.email: raise 400 "Phone or email required"
+# if find_user(data.phone, data.email): raise 400 "Account already exists"
 
-@router.post("/api/auth/logout")
-async def logout(request: Request):
-    auth = request.headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        token = auth.replace("Bearer ", "").strip()
-        db = get_db()
-        db.execute("DELETE FROM sessions WHERE token=?", (token,))
-        db.commit(); db.close()
-    return {"ok": True}
-
-@router.get("/api/auth/me")
-async def check_me(request: Request):
-    email = get_current_user(request)
-    return {"ok": True, "email": email}
-
-# --- FORCE LOGOUT ALL - Must be at BOTTOM ---
-def logout_all_users():
-    try:
-        db = get_db()
-        db.execute("DELETE FROM sessions")
-        db.commit(); db.close()
-        print("ALL USERS LOGGED OUT - Must sign in again")
-    except Exception as e:
-        print(f"logout_all skipped: {e}")
-
-logout_all_users()
+# In login:
+# user = find_user(data.phone, data.email)
+# if not user or not verify_password(data.password, user["password_hash"]):
+#   raise 401 "Invalid phone/email or password"
