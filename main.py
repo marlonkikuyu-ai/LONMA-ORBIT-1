@@ -6,9 +6,7 @@ from threading import Thread
 from collections import defaultdict
 
 app = FastAPI()
-from auth import router
-app.include_router(router)
-
+# auth.py DISABLED - user auth is now in main.py only, to avoid duplicate routes
 @app.get("/login.html")
 async def login_page():
     return FileResponse("login.html")
