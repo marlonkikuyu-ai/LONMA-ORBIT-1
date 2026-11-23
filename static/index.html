@@ -1,18 +1,14 @@
 <script>
-// FORCE LOGIN - All users must sign in
-if(!localStorage.getItem('token')){
-  window.location.href='/login.html';
+async function forceCheck(){
+  const token = localStorage.getItem('token');
+  if(!token){ window.location.href='/login.html'; return; }
+  const r = await fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+token}});
+  if(!r.ok){ localStorage.clear(); window.location.href='/login.html'; }
 }
+forceCheck();
 function logout(){
   fetch('/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+localStorage.getItem('token')}});
   localStorage.clear();
   window.location.href='/login.html';
 }
-</script>
-<div style="background:#1e293b;padding:10px;display:flex;justify-content:space-between;align-items:center">
-  <span id="userEmail" style="color:white;font-weight:bold"></span>
-  <button onclick="logout()" style="background:#ef4444;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer">Log Out</button>
-</div>
-<script>
-document.getElementById('userEmail').innerText='👤 '+ (localStorage.getItem('email')||'Member');
 </script>
