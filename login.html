@@ -22,10 +22,10 @@ button{width:100%;padding:12px;margin:8px 0;border:none;border-radius:8px;font-w
 </div>
 <div id="msg"></div>
 <input id="name" placeholder="Full name" style="display:none">
-<input id="phone" placeholder="07xxxxxxxx" type="tel">
+<input id="identifier" placeholder="Phone 07xxx OR Email" type="text">
 <input id="password" placeholder="Password (min 4 chars)" type="password">
 <button class="login" id="mainBtn" onclick="submitAuth()">Sign In</button>
-<p style="font-size:12px;text-align:center;opacity:.7">By creating an account you agree to Terms & Conditions. Password is encrypted.</p>
+<p style="font-size:12px;text-align:center;opacity:.7">Use phone or email. By creating an account you agree to Terms & Conditions.</p>
 </div>
 <script>
 let mode='login';
@@ -36,21 +36,26 @@ function show(m){mode=m;
  document.getElementById('mainBtn').innerText=m=='login'?'Sign In':'Create Account';
 }
 async function submitAuth(){
- const phone=document.getElementById('phone').value.trim();
+ const identifier=document.getElementById('identifier').value.trim();
  const password=document.getElementById('password').value;
  const name=document.getElementById('name').value.trim();
- if(!phone||!password){document.getElementById('msg').innerText='Enter phone + password';return;}
+ if(!identifier||!password){document.getElementById('msg').innerText='Enter phone/email + password';return;}
  if(mode=='signup'&&!name){document.getElementById('msg').innerText='Enter full name';return;}
+ // Auto-detect: contains @ = email, else phone
+ const isEmail = identifier.includes('@');
  const url=mode=='login'?'/api/auth/login':'/api/auth/signup';
- const body=mode=='login'?{phone,password}:{phone,password,name};
+ const body=mode=='login'
+   ? (isEmail ? {email:identifier,password} : {phone:identifier,password})
+   : (isEmail ? {email:identifier,password,name} : {phone:identifier,password,name});
  document.getElementById('msg').innerText='Please wait...';
  try{
   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const d=await r.json();
   if(!r.ok){document.getElementById('msg').innerText=d.detail||'Failed';return;}
   localStorage.setItem('token',d.token);
-  localStorage.setItem('phone',d.phone||phone);
   localStorage.setItem('name',d.name||name||'');
+  if(d.phone) localStorage.setItem('phone',d.phone);
+  if(d.email) localStorage.setItem('email',d.email);
   document.getElementById('msg').innerText='Welcome '+(d.name||name);
   setTimeout(()=>location.href='/',800);
  }catch(e){document.getElementById('msg').innerText='Network error';}
