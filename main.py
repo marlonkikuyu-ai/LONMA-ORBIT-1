@@ -12,6 +12,14 @@ app.include_router(router)
 @app.get("/login.html")
 async def login_page():
     return FileResponse("login.html")
+@app.get("/")
+def root():
+    return FileResponse("login.html")
+
+@app.get("/home")
+def home():
+    return FileResponse("index.html")
+
 # SECURITY: Only your domains can call API
 app.add_middleware(
     CORSMiddleware,
