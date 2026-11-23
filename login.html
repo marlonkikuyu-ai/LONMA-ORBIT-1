@@ -8,7 +8,7 @@
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
 body{background:#0b1220;color:white;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
 .card{background:#111a2e;width:100%;max-width:420px;padding:28px 24px;border-radius:18px;border:1px solid #1e293b}
-.logo{width:90px;height:90px;object-fit:cover;border-radius:50%;display:block;margin:0 auto;border:3px solid #22c55e;box-shadow:0 4px 15px rgba(0,0,0,.4);background:white}
+.logo{width:90px;height:90px;object-fit:cover;border-radius:50%;display:block;margin:0 auto;border:3px solid #22c55e;background:white}
 h1{text-align:center;font-size:22px;letter-spacing:2px;margin-top:12px}
 .sub{text-align:center;color:#94a3b8;font-size:13px;margin:6px 0 18px}
 .tabs{display:flex;background:#0b1220;border-radius:10px;padding:4px;margin-bottom:16px}
@@ -16,7 +16,6 @@ h1{text-align:center;font-size:22px;letter-spacing:2px;margin-top:12px}
 .tabs button.active{background:#22c55e;color:white}
 label{font-size:13px;color:#cbd5e1;display:block;margin:12px 0 6px}
 input{width:100%;padding:12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:white;outline:none}
-input:focus{border-color:#22c55e}
 .btn{width:100%;padding:13px;margin-top:18px;border:0;border-radius:10px;background:#22c55e;color:white;font-weight:bold;font-size:15px;cursor:pointer}
 .msg{text-align:center;font-size:13px;margin-top:12px;min-height:18px}
 .msg.error{color:#f87171}.msg.success{color:#4ade80}
@@ -24,79 +23,74 @@ input:focus{border-color:#22c55e}
 </head>
 <body>
 <div class="card">
-<img src="/logo.png" class="logo" alt="LONMA ORBIT">
+<img src="/logo.png" class="logo">
 <h1>LONMA ORBIT</h1>
 <p class="sub">Quality Products, Delivered to You</p>
-
 <div class="tabs">
 <button id="tabSignin" class="active" onclick="showTab('signin')">Sign In</button>
 <button id="tabSignup" onclick="showTab('signup')">Create Account</button>
 </div>
-
-<!-- SIGN IN -->
 <div id="signinBox">
-<label>Email</label>
-<input id="loginEmail" type="email" placeholder="Enter your email">
-<label>Password</label>
-<input id="loginPassword" type="password" placeholder="Enter your password">
+<label>Email</label><input id="loginEmail" type="email" placeholder="Enter your email">
+<label>Password</label><input id="loginPassword" type="password" placeholder="Enter your password">
 <button class="btn" onclick="doLogin()">Sign In</button>
 </div>
-
-<!-- SIGN UP -->
 <div id="signupBox" style="display:none">
-<label>Full Name</label>
-<input id="regName" type="text" placeholder="Enter your full name">
-<label>Email</label>
-<input id="regEmail" type="email" placeholder="Enter your email">
-<label>Password</label>
-<input id="regPassword" type="password" placeholder="Create a password">
+<label>Full Name</label><input id="regName" type="text" placeholder="Enter your full name">
+<label>Email</label><input id="regEmail" type="email" placeholder="Enter your email">
+<label>Password</label><input id="regPassword" type="password" placeholder="Create a password">
 <button class="btn" onclick="doRegister()">Create Account</button>
 </div>
-
 <div id="msg" class="msg"></div>
 </div>
-
 <script>
 function showTab(t){
-  document.getElementById('signinBox').style.display = t==='signin' ? 'block':'none';
-  document.getElementById('signupBox').style.display = t==='signup' ? 'block':'none';
-  document.getElementById('tabSignin').classList.toggle('active', t==='signin');
-  document.getElementById('tabSignup').classList.toggle('active', t==='signup');
+  document.getElementById('signinBox').style.display=t==='signin'?'block':'none';
+  document.getElementById('signupBox').style.display=t==='signup'?'block':'none';
+  document.getElementById('tabSignin').classList.toggle('active',t==='signin');
+  document.getElementById('tabSignup').classList.toggle('active',t==='signup');
   document.getElementById('msg').textContent='';
 }
-function setMsg(text, ok){
-  const m=document.getElementById('msg');
-  m.textContent=text; m.className='msg '+(ok?'success':'error');
-}
-function goInside(data, email){
-  localStorage.setItem('token', data.token || data.access_token || 'loggedin');
-  localStorage.setItem('user', JSON.stringify(data.user || {name:data.name, email:email}));
-  localStorage.setItem('lonma_user', email);
-  window.location.href='/home';
-}
-async function doLogin(){
-  const email=document.getElementById('loginEmail').value.trim().toLowerCase();
-  const password=document.getElementById('loginPassword').value;
-  if(!email||!password) return setMsg('Enter email and password', false);
-  try{
-    const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
-    const data=await r.json();
-    if(!r.ok || data.success===false) return setMsg(data.message||'Invalid email or password', false);
-    goInside(data, email);
-  }catch(e){ setMsg('Network error, try again', false); }
-}
+function setMsg(text,ok){const m=document.getElementById('msg');m.textContent=text;m.className='msg '+(ok?'success':'error');}
 async function doRegister(){
   const name=document.getElementById('regName').value.trim();
   const email=document.getElementById('regEmail').value.trim().toLowerCase();
   const password=document.getElementById('regPassword').value;
-  if(!name||!email||!password) return setMsg('Fill all fields', false);
+  if(!name||!email||!password) return setMsg('Fill all fields',false);
+  if(password.length<4) return setMsg('Password min 4 chars',false);
+  setMsg('Creating account...',true);
   try{
-    const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,password})});
+    const r=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,phone:email,password})});
     const data=await r.json();
-    if(!r.ok || data.success===false) return setMsg(data.message||'Registration failed', false);
-    setMsg('Welcome '+data.name+'! Entering app...', true);
-    setTimeout(()=>goInside(data, email), 600);
-  }catch(e){ setMsg('Network error, try again', false); }
+    console.log('REGISTER:',r.status,data);
+    if(data.status!=='ok'){
+      // Joram already tried - account may exist
+      if((data.message||'').toLowerCase().includes('exist')){
+        setMsg('Account exists - please Sign In',false);
+        setTimeout(()=>{showTab('signin');document.getElementById('loginEmail').value=email;},800);
+        return;
+      }
+      return setMsg(data.message||('Registration failed - Code '+r.status),false);
+    }
+    localStorage.setItem('lonma_user',JSON.stringify(data.user));
+    localStorage.setItem('token','loggedin');
+    setMsg('Welcome '+data.user.name+'! Entering app...',true);
+    setTimeout(()=>window.location.href='/home',600);
+  }catch(e){ setMsg('Network error: '+e.message,false); }
+}
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim().toLowerCase();
+  const password=document.getElementById('loginPassword').value;
+  if(!email||!password) return setMsg('Enter email and password',false);
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,phone:email,password})});
+    const data=await r.json();
+    console.log('LOGIN:',r.status,data);
+    if(data.status!=='ok') return setMsg(data.message||'Wrong email or password',false);
+    localStorage.setItem('lonma_user',JSON.stringify(data.user));
+    localStorage.setItem('token','loggedin');
+    window.location.href='/home';
+  }catch(e){ setMsg('Network error',false); }
 }
 </script>
 </body>
