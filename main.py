@@ -6,6 +6,12 @@ from threading import Thread
 from collections import defaultdict
 
 app = FastAPI()
+from auth import router
+app.include_router(router)
+
+@app.get("/login.html")
+async def login_page():
+    return FileResponse("login.html")
 # SECURITY: Only your domains can call API
 app.add_middleware(
     CORSMiddleware,
