@@ -1,20 +1,18 @@
-<div class="side-menu" id="sideMenu">
-  <div style="background:var(--teal);color:#fff;padding:18px;text-align:center">
-    <div style="background:#fff;width:70px;height:70px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer" onclick="show('products');closeSideMenu()">
-      <img src="/logo.png" style="height:64px;width:64px;object-fit:cover;border-radius:50%">
-    </div>
-    <h3 style="margin:8px 0 0">LONMA ORBIT</h3>
-    <p style="margin:2px 0 0;font-size:11px">100% LONMA Original</p>
-  </div>
-  <div style="padding:8px">
-    <div style="padding:12px;border-bottom:1px solid #eee;cursor:pointer" onclick="show('products');closeSideMenu()">🏠 LONMA Products</div>
-    <div style="padding:12px;border-bottom:1px solid #eee;cursor:pointer" onclick="show('cart');closeSideMenu()">🛒 Cart (<span id="sideCartCount">0</span>)</div>
-    <div style="padding:12px;border-bottom:1px solid #eee;cursor:pointer" onclick="show('wishlist');closeSideMenu()">♡ Wishlist</div>
-    <div style="padding:12px;border-bottom:1px solid #eee;cursor:pointer" onclick="show('friends');closeSideMenu()">👥 Friends & Meet</div>
-    <div style="padding:12px;border-bottom:1px solid #eee;cursor:pointer" onclick="show('orders');closeSideMenu()">📦 Orders & Tracking</div>
-    <div style="padding:12px;border-bottom:1px solid #eee;cursor:pointer" onclick="show('loyaltyPage');closeSideMenu()">⭐ Loyalty Points</div>
-    <div style="padding:12px;border-bottom:1px solid #eee;cursor:pointer" onclick="show('scan');closeSideMenu()">✅ Verify LONMA Code</div>
-    <div style="padding:12px;border-bottom:1px solid #eee;cursor:pointer" onclick="show('settings');closeSideMenu()">⚙️ Settings</div>
-    <div style="padding:12px;cursor:pointer;background:#f0f9fb" onclick="show('admin');closeSideMenu()">🔐 Admin Analytics</div>
-  </div>
+<script>
+// FORCE LOGIN - All users must sign in
+if(!localStorage.getItem('token')){
+  window.location.href='/login.html';
+}
+function logout(){
+  fetch('/api/auth/logout',{method:'POST',headers:{'Authorization':'Bearer '+localStorage.getItem('token')}});
+  localStorage.clear();
+  window.location.href='/login.html';
+}
+</script>
+<div style="background:#1e293b;padding:10px;display:flex;justify-content:space-between;align-items:center">
+  <span id="userEmail" style="color:white;font-weight:bold"></span>
+  <button onclick="logout()" style="background:#ef4444;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer">Log Out</button>
 </div>
+<script>
+document.getElementById('userEmail').innerText='👤 '+ (localStorage.getItem('email')||'Member');
+</script>
