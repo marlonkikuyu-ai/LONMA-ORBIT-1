@@ -16,7 +16,11 @@ def root():
 
 @app.get("/home")
 def home():
-    return FileResponse("index.html")
+    return HTMLResponse(HTML)
+
+@app.get("/index.html")
+def index_html():
+    return HTMLResponse(HTML)
 
 # SECURITY: Only your domains can call API
 app.add_middleware(
