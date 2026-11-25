@@ -430,7 +430,20 @@ async def reg(req:Request):
     if cur.fetchone(): return {"status":"error","message":"Account already exists. Please Sign In or use Forgot Password."}
     cur.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)",(phone,name,hash_pw(pwd))); conn.commit()
     return {"status":"ok","user":{"phone":phone,"name":name}}
+    return {"status":"ok","message":"Account created"}
+
+@app.post("/api/auth/forgot")
+async def forgot(req: Request):
+    ... your code ...
+
+@app.post("/api/auth/reset")
+async def reset_password(req: Request):
+    ... your code ...
+
 @app.post("/api/auth/login")
+async def login(req: Request):
+
+app.post("/api/auth/login")
 async def log(req:Request):
     ip=req.client.host if req.client else "unknown"
     if is_blocked(ip): return {"status":"error","message":"Too many tries. Wait 15 mins"}
