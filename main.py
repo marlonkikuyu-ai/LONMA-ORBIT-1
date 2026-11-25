@@ -753,3 +753,18 @@ async def signup_alias(req: Request):
 @app.post("/api/signin")
 async def signin_alias(req: Request):
     return await log(req)
+@app.post("/api/auth/forgot-password")
+async def forgot_pw(req: Request):
+    d = await req.json()
+    email = clean_input(d.get("email",""), 100).lower()
+    newpw = d.get("password","").strip()[:50]
+    if not email or "@" not in email or len(newpw) < 4:
+        return {"status":"error","message":"Enter valid email and new password min 4 chars"}
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE email=? OR phone=?", (email, email))
+    row = cur.fetchone()
+    if not row:
+        return {"status":"error","message":"No account found for this email. Please Create Account first."}
+    cur.execute("UPDATE users SET password=? WHERE id=?", (hash_pw(newpw), row[0]))
+    conn.commit()
+    return {"status":"ok","message":"Password reset"}
