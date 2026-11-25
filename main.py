@@ -434,12 +434,44 @@ async def reg(req:Request):
 
 @app.post("/api/auth/forgot")
 async def forgot(req: Request):
-    ... your code ...
+@app.post("/api/auth/forgot")
+async def forgot(req: Request):
+    d = await req.json()
+    phone = clean_input(d.get("phone",""), 15)
+    if len(phone) < 9:
+        return {"status":"error","message":"Enter valid phone number"}
+    cur = conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?", (phone,))
+    if not cur.fetchone():
+        return {"status":"ok","message":"If this number is registered, a code was sent"}
+    code = f"{random.randint(100000,999999)}"
+    otp_store[phone] = {"code": code, "expires": time.time()+600, "attempts": 0}
+    send_sms(normalize_phone(phone), f"Your LONMA ORBIT reset code is: {code}. Valid for 10 minutes. Do not share it.")
+    return {"status":"ok","message":"Code sent to your phone"}
 
 @app.post("/api/auth/reset")
 async def reset_password(req: Request):
-    ... your code ...
-
+    d = await req.json()
+    phone = clean_input(d.get("phone",""), 15)
+    code = str(d.get("code","")).strip()
+    pwd = d.get("password","").strip()
+    if len(pwd) < 4:
+        return {"status":"error","message":"Password must be at least 4 characters"}
+    otp = otp_store.get(phone)
+    if not otp:
+        return {"status":"error","message":"No code requested. Tap 'Send Code' first"}
+    if time.time() > otp["expires"]:
+        del otp_store[phone]
+        return {"status":"error","message":"Code expired. Request a new one"}
+    otp["attempts"] += 1
+    if otp["attempts"] > 5:
+        del otp_store[phone]
+        return {"status":"error","message":"Too many attempts. Request a new code"}
+    if otp["code"] != code:
+        return {"status":"error","message":"Wrong code"}
+    cur = conn.cursor(); cur.execute("UPDATE users SET password=? WHERE phone=?", (hash_pw(pwd), phone))
+    conn.commit()
+    del otp_store[phone]
+    return {"status":"ok","message":"Password reset successful. Please Sign In"}
 @app.post("/api/auth/login")
 async def login(req: Request):
 
