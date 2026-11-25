@@ -465,10 +465,10 @@ async def reset_password(req: Request):
         return {"status":"error","message":"Too many attempts. Request a new code"}
     if otp["code"] != code:
         return {"status":"error","message":"Wrong code"}
-        cur = conn.cursor(); cur.execute("UPDATE users SET password=? WHERE phone=?", (hash_pw(pwd), phone))
-        conn.commit()
-        del otp_store[phone]
-        return {"status":"ok","message":"Password reset successful. Please Sign In"}
+    cur = conn.cursor(); cur.execute("UPDATE users SET password=? WHERE phone=?", (hash_pw(pwd), phone))
+    conn.commit()
+    del otp_store[phone]
+    return {"status":"ok","message":"Password reset successful. Please Sign In"}
  @app.post("/api/auth/login")
 async def log(req:Request):
     ip=req.client.host if req.client else "unknown"
