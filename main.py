@@ -4,22 +4,34 @@ from fastapi.middleware.cors import CORSMiddleware
 import os, sqlite3, json, datetime, requests, base64, time, re, random, hashlib, hmac, secrets
 from threading import Thread
 from collections import defaultdict
+
 # --- SMS OTP FOR ALL USERS ---
 AT_USERNAME = os.environ.get("AT_USERNAME", "sandbox")
 AT_API_KEY = os.environ.get("AT_API_KEY", "")
 AT_SENDER = os.environ.get("AT_SENDER", "LONMA")
+SMS_API_KEY = os.getenv("SMS_API_KEY", "")
+SMS_USERNAME = os.getenv("SMS_USERNAME", "")
+SMS_SENDER = os.getenv("SMS_SENDER", "LONMA")
 otp_store = {}
+DB_PATH = "lonma.db"
 
 def send_sms(phone, message):
-    if not AT_API_KEY:
+    # Try SMS_API_KEY first, then AT_API_KEY
+    api_key = SMS_API_KEY or AT_API_KEY
+    username = SMS_USERNAME or AT_USERNAME
+    sender = SMS_SENDER or AT_SENDER
+    if not api_key:
         print(f"[OTP DEBUG] To {phone}: {message}")
         return True
     try:
-        r = requests.post("https://api.africastalking.com/version1/messaging",
-            data={"username": AT_USERNAME, "to": phone, "message": message, "from": AT_SENDER},
-            headers={"apiKey": AT_API_KEY, "Accept": "application/json"}, timeout=15)
+        r = requests.post(
+            "https://api.africastalking.com/version1/messaging",
+            data={"username": username, "to": phone, "message": message, "from": sender},
+            headers={"apiKey": api_key, "Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"},
+            timeout=15,
+        )
         print("SMS sent:", r.text[:200])
-        return True
+        return r.status_code in (200, 201)
     except Exception as e:
         print("SMS FAILED:", e)
         return False
@@ -31,11 +43,13 @@ def normalize_phone(phone):
     if len(phone) == 10 and phone.startswith("0"):
         phone = "254" + phone[1:]
     return "+" + phone
+
 app = FastAPI()
-# auth.py DISABLED - user auth is now in main.py only, to avoid duplicate routes
+
 @app.get("/login.html")
 async def login_page():
     return FileResponse("login.html")
+
 @app.get("/")
 def root():
     return FileResponse("login.html")
@@ -48,7 +62,6 @@ def home():
 def index_html():
     return HTMLResponse(HTML)
 
-# SECURITY: Only your domains can call API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://app.lonmaorbit.co.ke", "https://lonmaorbit.co.ke"],
@@ -56,31 +69,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- SECURITY: NO secrets in code ---
 DARAJA_KEY = os.getenv("DARAJA_KEY", "")
 DARAJA_SECRET = os.getenv("DARAJA_SECRET", "")
-DARAJA_SHORTCODE = os.getenv("DARAJA_SHORTCODE", "") # No 174379 default
+DARAJA_SHORTCODE = os.getenv("DARAJA_SHORTCODE", "")
 DARAJA_PASSKEY = os.getenv("DARAJA_PASSKEY", "")
 DARAJA_CALLBACK = os.getenv("CALLBACK_URL", "https://app.lonmaorbit.co.ke/mpesa/callback")
 USE_PROD = os.getenv("DARAJA_ENV", "sandbox") == "production"
-
-AIRTEL_KEY = os.getenv("AIRTEL_KEY", ""); AIRTEL_SECRET = os.getenv("AIRTEL_SECRET", "")
+AIRTEL_KEY = os.getenv("AIRTEL_KEY", "")
+AIRTEL_SECRET = os.getenv("AIRTEL_SECRET", "")
 STRIPE_KEY = os.getenv("STRIPE_KEY", "")
-
-# --- ADMIN ONLY: marlonkikuyu@gmail.com ---
 ADMIN_EMAIL = "marlonkikuyu@gmail.com"
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "") # MUST be set in Render, NO default
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+SHOW_RESET_CODE = os.getenv("SHOW_RESET_CODE", "false").lower() == "true"
 
-SMS_API_KEY = os.getenv("SMS_API_KEY", ""); SMS_USERNAME = os.getenv("SMS_USERNAME", ""); SMS_SENDER = os.getenv("SMS_SENDER", "LONMA")
-SHOW_RESET_CODE = os.getenv("SHOW_RESET_CODE", "false").lower() == "true" # Keep false in production
-
-# --- AUDIT LOG + ADMIN CHECK ---
 def audit_log(action, user_email, details):
     entry = f"{datetime.datetime.now()} | {action} | by={user_email} | {details}\n"
     try:
         with open("audit.log", "a") as f:
             f.write(entry)
-    except:
+    except Exception:
         pass
     print(f"[AUDIT] {entry}")
 
@@ -90,59 +97,60 @@ def require_admin(user_email: str):
         raise HTTPException(status_code=403, detail="Only Admin can make changes")
     return True
 
-# --- PASSWORD HASHING ---
 def hash_pw(pw: str):
     salt = secrets.token_hex(16)
     h = hashlib.pbkdf2_hmac('sha256', pw.encode(), salt.encode(), 100000).hex()
     return f"{salt}:{h}"
+
 def check_pw(pw: str, stored: str):
-    if not stored: return False
-    # New hashed format salt:hash
-    if ":" in stored and len(stored.split(":")[0])==32:
+    if not stored:
+        return False
+    if ":" in stored and len(stored.split(":")[0]) == 32:
         try:
             salt, h = stored.split(":")
             nh = hashlib.pbkdf2_hmac('sha256', pw.encode(), salt.encode(), 100000).hex()
             return hmac.compare_digest(h, nh)
-        except: return False
-    # Legacy plain password - migrate on login
+        except Exception:
+            return False
     return hmac.compare_digest(stored, pw)
 
-def send_sms(phone, message):
-    # Try Africa's Talking if configured
-    if SMS_API_KEY and SMS_USERNAME:
-        try:
-            r=requests.post("https://api.africastalking.com/version1/messaging", data={"username":SMS_USERNAME,"to":phone,"message":message,"from":SMS_SENDER}, headers={"apiKey":SMS_API_KEY,"Content-Type":"application/x-www-form-urlencoded"}, timeout=10)
-            return r.status_code in (200,201)
-        except: pass
-    # TODO: Add Twilio here if you use Twilio
+FAILED = defaultdict(list)
+BLOCKED = {}
+
+def is_blocked(ip):
+    now = time.time()
+    FAILED[ip] = [t for t in FAILED[ip] if now - t < 300]
+    if ip in BLOCKED and now < BLOCKED[ip]:
+        return True
+    if len(FAILED[ip]) >= 5:
+        BLOCKED[ip] = now + 900
+        return True
     return False
 
-FAILED = defaultdict(list); BLOCKED = {}
-def is_blocked(ip):
-    now=time.time()
-    FAILED[ip]=[t for t in FAILED[ip] if now-t<300]
-    if ip in BLOCKED and now < BLOCKED[ip]: return True
-    if len(FAILED[ip])>=5:
-        BLOCKED[ip]=now+900; return True
-    return False
-def record_fail(ip): FAILED[ip].append(time.time())
+def record_fail(ip):
+    FAILED[ip].append(time.time())
+
 def clean_input(s, maxlen=500):
-    if not isinstance(s,str): return ""
-    s=s.strip()[:maxlen]; s=re.sub(r'[<>\"\'`;]', '', s); return s
+    if not isinstance(s, str):
+        return ""
+    s = s.strip()[:maxlen]
+    s = re.sub(r'[<>\"\'`;]', '', s)
+    return s
 
 @app.middleware("http")
 async def security_middleware(request, call_next):
-    path=request.url.path.lower()
-    bad=[".env","wp-admin","phpmyadmin",".git","config","admin.php",".sql","wp-login"]
-    if any(b in path for b in bad): return HTMLResponse("Not Found", status_code=404)
-    response=await call_next(request)
-    response.headers["X-Content-Type-Options"]="nosniff"
-    response.headers["X-Frame-Options"]="DENY"
-    response.headers["X-XSS-Protection"]="1; mode=block"
-    response.headers["Strict-Transport-Security"]="max-age=31536000"
+    path = request.url.path.lower()
+    bad = [".env", "wp-admin", "phpmyadmin", ".git", "config", "admin.php", ".sql", "wp-login"]
+    if any(b in path for b in bad):
+        return HTMLResponse("Not Found", status_code=404)
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000"
     return response
 
-conn=sqlite3.connect("lonma.db",check_same_thread=False)
+conn = sqlite3.connect(DB_PATH, check_same_thread=False)
 conn.execute("CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, name TEXT, price INTEGER, code TEXT, image TEXT, category TEXT, stock INTEGER)")
 conn.execute("CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, order_no TEXT, name TEXT, phone TEXT, area TEXT, location TEXT, items TEXT, total INTEGER, status TEXT, created TEXT, mpesa_receipt TEXT, checkout_id TEXT, pay_method TEXT)")
 conn.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, phone TEXT UNIQUE, name TEXT, password TEXT)")
@@ -152,368 +160,502 @@ conn.execute("CREATE TABLE IF NOT EXISTS promos (code TEXT PRIMARY KEY, discount
 conn.execute("CREATE TABLE IF NOT EXISTS community_posts (id INTEGER PRIMARY KEY AUTOINCREMENT, author TEXT, phone TEXT, text TEXT, image TEXT, likes INTEGER DEFAULT 0, reposts INTEGER DEFAULT 0, created TEXT)")
 conn.execute("CREATE TABLE IF NOT EXISTS community_comments (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, author TEXT, text TEXT, created TEXT)")
 conn.execute("CREATE TABLE IF NOT EXISTS community_likes (post_id INTEGER, phone TEXT, UNIQUE(post_id, phone))")
-cur=conn.cursor()
-try: cur.execute("ALTER TABLE orders ADD COLUMN pay_method TEXT")
-except: pass
-cur.execute("DELETE FROM products"); cur.execute("DELETE FROM promos")
-cur.execute("INSERT OR IGNORE INTO promos VALUES ('LONMA10',10)"); cur.execute("INSERT OR IGNORE INTO promos VALUES ('WELCOME20',20)")
-PRODS=[
-(1,"Diva Anti-Dandruff Pomade 250ml",250,"DIV-001","DIVA|#0A9EBB","Pomades",45),
-(2,"Detrex Pine Drops Soap 110g",95,"DET-002","DETREX|#0F766E","Soaps",80),
-(3,"Fresh Fri Cooking Oil 2L",890,"FRE-003","FRESH FRI|#B45309","Cooking Oils",50),
-(4,"Detrex Citronella Soap 110g",95,"DET-004","DETREX|#0F766E","Soaps",100),
-(5,"Sawa Men Lotion 72Hrs",320,"SAW-005","SAWA|#1E40AF","Lotions",12),
-(6,"Detrex Cool Mint Soap 110g",95,"DET-006","DETREX|#0F766E","Soaps",4),
-(7,"Diva Anti-Breakage Pomade 250ml",250,"DIV-007","DIVA|#0A9EBB","Pomades",30),
-(8,"Sawa Cocoa Butter Lotion 72Hrs",320,"SAW-008","SAWA|#1E40AF","Lotions",28),
-(9,"Detrex Germ Protection Soap 110g",95,"DET-009","DETREX|#0F766E","Soaps",60),
+cur = conn.cursor()
+try:
+    cur.execute("ALTER TABLE orders ADD COLUMN pay_method TEXT")
+except Exception:
+    pass
+cur.execute("DELETE FROM products")
+cur.execute("DELETE FROM promos")
+cur.execute("INSERT OR IGNORE INTO promos VALUES ('LONMA10',10)")
+cur.execute("INSERT OR IGNORE INTO promos VALUES ('WELCOME20',20)")
+PRODS = [
+    (1, "Diva Anti-Dandruff Pomade 250ml", 250, "DIV-001", "DIVA|#0A9EBB", "Pomades", 45),
+    (2, "Detrex Pine Drops Soap 110g", 95, "DET-002", "DETREX|#0F766E", "Soaps", 80),
+    (3, "Fresh Fri Cooking Oil 2L", 890, "FRE-003", "FRESH FRI|#B45309", "Cooking Oils", 50),
+    (4, "Detrex Citronella Soap 110g", 95, "DET-004", "DETREX|#0F766E", "Soaps", 100),
+    (5, "Sawa Men Lotion 72Hrs", 320, "SAW-005", "SAWA|#1E40AF", "Lotions", 12),
+    (6, "Detrex Cool Mint Soap 110g", 95, "DET-006", "DETREX|#0F766E", "Soaps", 4),
+    (7, "Diva Anti-Breakage Pomade 250ml", 250, "DIV-007", "DIVA|#0A9EBB", "Pomades", 30),
+    (8, "Sawa Cocoa Butter Lotion 72Hrs", 320, "SAW-008", "SAWA|#1E40AF", "Lotions", 28),
+    (9, "Detrex Germ Protection Soap 110g", 95, "DET-009", "DETREX|#0F766E", "Soaps", 60),
 ]
-for pid,name,price,code,img,cat,stock in PRODS:
-    cur.execute("INSERT INTO products VALUES (?,?,?,?,?,?,?)",(pid,name,price,code,img,cat,stock))
-cur.execute("DELETE FROM community_posts"); cur.execute("DELETE FROM community_comments"); cur.execute("DELETE FROM community_likes")
+for pid, name, price, code, img, cat, stock in PRODS:
+    cur.execute("INSERT INTO products VALUES (?,?,?,?,?,?,?)", (pid, name, price, code, img, cat, stock))
+cur.execute("DELETE FROM community_posts")
+cur.execute("DELETE FROM community_comments")
+cur.execute("DELETE FROM community_likes")
 conn.commit()
 
 def get_token():
     try:
-        base="https://api.safaricom.co.ke" if USE_PROD else "https://sandbox.safaricom.co.ke"
-        r=requests.get(f"{base}/oauth/v1/generate?grant_type=client_credentials",auth=(DARAJA_KEY,DARAJA_SECRET),timeout=10)
+        base = "https://api.safaricom.co.ke" if USE_PROD else "https://sandbox.safaricom.co.ke"
+        r = requests.get(f"{base}/oauth/v1/generate?grant_type=client_credentials", auth=(DARAJA_KEY, DARAJA_SECRET), timeout=10)
         return r.json().get("access_token")
-    except: return None
+    except Exception:
+        return None
 
-@app.api_route("/mpesa/callback",methods=["GET","POST"])
-async def callback(request:Request):
+@app.api_route("/mpesa/callback", methods=["GET", "POST"])
+async def callback(request: Request):
     try:
-        data=await request.json(); stk=data.get("Body",{}).get("stkCallback",{})
-        if stk.get("ResultCode")==0:
-            receipt=""
-            for it in stk.get("CallbackMetadata",{}).get("Item",[]):
-                if it.get("Name")=="MpesaReceiptNumber": receipt=it.get("Value")
-            conn.execute("UPDATE orders SET status='PAID', mpesa_receipt=? WHERE checkout_id=?",(receipt,stk.get("CheckoutRequestID",""))); conn.commit()
-        return {"ResultCode":0,"ResultDesc":"Accepted"}
-    except: return {"ResultCode":0,"ResultDesc":"Accepted"}
+        data = await request.json()
+        stk = data.get("Body", {}).get("stkCallback", {})
+        if stk.get("ResultCode") == 0:
+            receipt = ""
+            for it in stk.get("CallbackMetadata", {}).get("Item", []):
+                if it.get("Name") == "MpesaReceiptNumber":
+                    receipt = it.get("Value")
+            conn.execute("UPDATE orders SET status='PAID', mpesa_receipt=? WHERE checkout_id=?", (receipt, stk.get("CheckoutRequestID", "")))
+            conn.commit()
+        return {"ResultCode": 0, "ResultDesc": "Accepted"}
+    except Exception:
+        return {"ResultCode": 0, "ResultDesc": "Accepted"}
 
 @app.get("/api/health")
 def health():
-    return {"status":"ok","mpesa_env":"production" if USE_PROD else "sandbox","mpesa_configured":bool(DARAJA_KEY and DARAJA_PASSKEY),"airtel_configured":bool(AIRTEL_KEY),"card_configured":bool(STRIPE_KEY),"sms_configured":bool(SMS_API_KEY),"show_reset_code":SHOW_RESET_CODE}
+    return {"status": "ok", "mpesa_env": "production" if USE_PROD else "sandbox", "mpesa_configured": bool(DARAJA_KEY and DARAJA_PASSKEY), "airtel_configured": bool(AIRTEL_KEY), "card_configured": bool(STRIPE_KEY), "sms_configured": bool(SMS_API_KEY or AT_API_KEY), "show_reset_code": SHOW_RESET_CODE}
 
 @app.get("/api/community/posts")
-def get_posts(phone:str=""):
-    cur=conn.cursor(); cur.execute("SELECT id,author,phone,text,image,likes,reposts,created FROM community_posts ORDER BY id DESC LIMIT 50")
-    out=[]
+def get_posts(phone: str = ""):
+    cur = conn.cursor()
+    cur.execute("SELECT id,author,phone,text,image,likes,reposts,created FROM community_posts ORDER BY id DESC LIMIT 50")
+    out = []
     for r in cur.fetchall():
-        cur2=conn.cursor(); cur2.execute("SELECT COUNT(*) FROM community_comments WHERE post_id=?",(r[0],)); cc=cur2.fetchone()[0]
-        liked=False
+        cur2 = conn.cursor()
+        cur2.execute("SELECT COUNT(*) FROM community_comments WHERE post_id=?", (r[0],))
+        cc = cur2.fetchone()[0]
+        liked = False
         if phone:
-            cur2.execute("SELECT 1 FROM community_likes WHERE post_id=? AND phone=?",(r[0],phone,)); liked=cur2.fetchone() is not None
-        out.append({"id":r[0],"author":r[1],"phone":r[2],"text":r[3],"image":r[4],"likes":r[5],"reposts":r[6],"created":r[7],"comments":cc,"liked":liked})
+            cur2.execute("SELECT 1 FROM community_likes WHERE post_id=? AND phone=?", (r[0], phone))
+            liked = cur2.fetchone() is not None
+        out.append({"id": r[0], "author": r[1], "phone": r[2], "text": r[3], "image": r[4], "likes": r[5], "reposts": r[6], "created": r[7], "comments": cc, "liked": liked})
     return out
 
 @app.post("/api/community/post")
-async def create_post(req:Request):
-    d=await req.json(); text=clean_input(d.get("text",""),500); author=clean_input(d.get("author","Customer"),30); phone=clean_input(d.get("phone",""),15)
-    if not text or len(text)<2: return {"status":"error"}
-    conn.execute("INSERT INTO community_posts (author,phone,text,image,likes,reposts,created) VALUES (?,?,?,?,0,0,?)",(author,phone,text,"",datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))); conn.commit()
-    return {"status":"ok"}
+async def create_post(req: Request):
+    d = await req.json()
+    text = clean_input(d.get("text", ""), 500)
+    author = clean_input(d.get("author", "Customer"), 30)
+    phone = clean_input(d.get("phone", ""), 15)
+    if not text or len(text) < 2:
+        return {"status": "error"}
+    conn.execute("INSERT INTO community_posts (author,phone,text,image,likes,reposts,created) VALUES (?,?,?,?,0,0,?)", (author, phone, text, "", datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
+    conn.commit()
+    return {"status": "ok"}
 
 @app.post("/api/community/like")
-async def like_post(req:Request):
-    d=await req.json()
-    try: pid=int(d.get("post_id",0))
-    except: return {"status":"error"}
-    phone=clean_input(d.get("phone",""),15)
-    cur=conn.cursor(); cur.execute("SELECT 1 FROM community_likes WHERE post_id=? AND phone=?",(pid,phone,))
+async def like_post(req: Request):
+    d = await req.json()
+    try:
+        pid = int(d.get("post_id", 0))
+    except Exception:
+        return {"status": "error"}
+    phone = clean_input(d.get("phone", ""), 15)
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM community_likes WHERE post_id=? AND phone=?", (pid, phone))
     if cur.fetchone():
-        conn.execute("DELETE FROM community_likes WHERE post_id=? AND phone=?",(pid,phone,)); conn.execute("UPDATE community_posts SET likes=likes-1 WHERE id=?",(pid,)); conn.commit(); return {"status":"unliked"}
-    conn.execute("INSERT INTO community_likes VALUES (?,?)",(pid,phone,)); conn.execute("UPDATE community_posts SET likes=likes+1 WHERE id=?",(pid,)); conn.commit(); return {"status":"liked"}
+        conn.execute("DELETE FROM community_likes WHERE post_id=? AND phone=?", (pid, phone))
+        conn.execute("UPDATE community_posts SET likes=likes-1 WHERE id=?", (pid,))
+        conn.commit()
+        return {"status": "unliked"}
+    conn.execute("INSERT INTO community_likes VALUES (?,?)", (pid, phone))
+    conn.execute("UPDATE community_posts SET likes=likes+1 WHERE id=?", (pid,))
+    conn.commit()
+    return {"status": "liked"}
 
 @app.post("/api/community/repost")
-async def repost(req:Request):
-    d=await req.json()
-    try: pid=int(d.get("post_id",0))
-    except: return {"status":"error"}
-    conn.execute("UPDATE community_posts SET reposts=reposts+1 WHERE id=?",(pid,)); conn.commit(); return {"status":"ok"}
+async def repost(req: Request):
+    d = await req.json()
+    try:
+        pid = int(d.get("post_id", 0))
+    except Exception:
+        return {"status": "error"}
+    conn.execute("UPDATE community_posts SET reposts=reposts+1 WHERE id=?", (pid,))
+    conn.commit()
+    return {"status": "ok"}
 
 @app.get("/api/community/comments/{pid}")
-def get_comments(pid:int):
-    cur=conn.cursor(); cur.execute("SELECT author,text,created FROM community_comments WHERE post_id=? ORDER BY id ASC",(pid,)); return [{"author":r[0],"text":r[1],"created":r[2]} for r in cur.fetchall()]
+def get_comments(pid: int):
+    cur = conn.cursor()
+    cur.execute("SELECT author,text,created FROM community_comments WHERE post_id=? ORDER BY id ASC", (pid,))
+    return [{"author": r[0], "text": r[1], "created": r[2]} for r in cur.fetchall()]
 
 @app.post("/api/community/comment")
-async def add_comment(req:Request):
-    d=await req.json()
-    try: pid=int(d.get("post_id",0))
-    except: return {"status":"error"}
-    conn.execute("INSERT INTO community_comments (post_id,author,text,created) VALUES (?,?,?,?)",(pid,clean_input(d.get("author","Customer"),30),clean_input(d.get("text",""),300),datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))); conn.commit()
-    return {"status":"ok"}
+async def add_comment(req: Request):
+    d = await req.json()
+    try:
+        pid = int(d.get("post_id", 0))
+    except Exception:
+        return {"status": "error"}
+    conn.execute("INSERT INTO community_comments (post_id,author,text,created) VALUES (?,?,?,?)", (pid, clean_input(d.get("author", "Customer"), 30), clean_input(d.get("text", ""), 300), datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
+    conn.commit()
+    return {"status": "ok"}
 
 @app.get("/api/community/trending")
 def trending():
-    cur=conn.cursor(); cur.execute("SELECT text FROM community_posts")
-    tags={}
+    cur = conn.cursor()
+    cur.execute("SELECT text FROM community_posts")
+    tags = {}
     for (t,) in cur.fetchall():
         for w in t.split():
             if w.startswith("#"):
-                tags[w]=tags.get(w,0)+1
-    sorted_tags=sorted(tags.items(), key=lambda x:-x[1])[:6]
-    return [{"tag":k,"count":v} for k,v in sorted_tags]
+                tags[w] = tags.get(w, 0) + 1
+    sorted_tags = sorted(tags.items(), key=lambda x: -x[1])[:6]
+    return [{"tag": k, "count": v} for k, v in sorted_tags]
 
 @app.get("/api/products")
 def prods_api():
-    cur=conn.cursor(); cur.execute("SELECT id,name,price,code,image,category,stock FROM products")
-    out=[]
+    cur = conn.cursor()
+    cur.execute("SELECT id,name,price,code,image,category,stock FROM products")
+    out = []
     for r in cur.fetchall():
-        cur2=conn.cursor(); cur2.execute("SELECT AVG(rating), COUNT(*) FROM reviews WHERE product_id=?",(r[0],)); avg=cur2.fetchone()
-        out.append({"id":r[0],"name":r[1],"price":r[2],"code":r[3],"image":r[4],"category":r[5],"stock":r[6],"rating":round(avg[0],1) if avg[0] else 0,"reviews":avg[1]})
+        cur2 = conn.cursor()
+        cur2.execute("SELECT AVG(rating), COUNT(*) FROM reviews WHERE product_id=?", (r[0],))
+        avg = cur2.fetchone()
+        out.append({"id": r[0], "name": r[1], "price": r[2], "code": r[3], "image": r[4], "category": r[5], "stock": r[6], "rating": round(avg[0], 1) if avg[0] else 0, "reviews": avg[1]})
     return out
 
 @app.get("/api/verify/{code}")
-def verify(code:str):
-    code=clean_input(code,20).upper(); cur=conn.cursor(); cur.execute("SELECT name FROM products WHERE code=?",(code,)); row=cur.fetchone()
-    return {"valid":True,"product":{"name":row[0]}} if row else {"valid":False}
+def verify(code: str):
+    code = clean_input(code, 20).upper()
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM products WHERE code=?", (code,))
+    row = cur.fetchone()
+    return {"valid": True, "product": {"name": row[0]}} if row else {"valid": False}
 
 @app.get("/api/orders")
-def orders_api(phone:str=""):
-    phone=clean_input(phone,15); cur=conn.cursor()
-    if phone: cur.execute("SELECT order_no,name,total,status,created FROM orders WHERE phone=? ORDER BY id DESC",(phone,))
-    else: cur.execute("SELECT order_no,name,total,status,created FROM orders ORDER BY id DESC LIMIT 50")
-    return [{"order_no":r[0],"name":r[1],"total":r[2],"status":r[3],"created":r[4]} for r in cur.fetchall()]
+def orders_api(phone: str = ""):
+    phone = clean_input(phone, 15)
+    cur = conn.cursor()
+    if phone:
+        cur.execute("SELECT order_no,name,total,status,created FROM orders WHERE phone=? ORDER BY id DESC", (phone,))
+    else:
+        cur.execute("SELECT order_no,name,total,status,created FROM orders ORDER BY id DESC LIMIT 50")
+    return [{"order_no": r[0], "name": r[1], "total": r[2], "status": r[3], "created": r[4]} for r in cur.fetchall()]
 
 @app.get("/api/track/{order_no}")
-def track(order_no:str):
-    cur=conn.cursor(); cur.execute("SELECT order_no,total,status,created FROM orders WHERE order_no=?",(clean_input(order_no,20),)); r=cur.fetchone()
-    if not r: return {"found":False}
-    steps=["Pending","PAID","Shipped","Delivered"]; idx=steps.index(r[2]) if r[2] in steps else 0
-    return {"found":True,"order_no":r[0],"total":r[1],"status":r[2],"created":r[3],"progress":(idx+1)*25}
+def track(order_no: str):
+    cur = conn.cursor()
+    cur.execute("SELECT order_no,total,status,created FROM orders WHERE order_no=?", (clean_input(order_no, 20),))
+    r = cur.fetchone()
+    if not r:
+        return {"found": False}
+    steps = ["Pending", "PAID", "Shipped", "Delivered"]
+    idx = steps.index(r[2]) if r[2] in steps else 0
+    return {"found": True, "order_no": r[0], "total": r[1], "status": r[2], "created": r[3], "progress": (idx + 1) * 25}
 
 @app.post("/api/promo/check")
-async def promo_check(req:Request):
-    d=await req.json(); cur=conn.cursor(); cur.execute("SELECT discount FROM promos WHERE code=?",(clean_input(d.get("code",""),20).upper(),)); r=cur.fetchone()
-    return {"valid":True,"discount":r[0]} if r else {"valid":False}
+async def promo_check(req: Request):
+    d = await req.json()
+    cur = conn.cursor()
+    cur.execute("SELECT discount FROM promos WHERE code=?", (clean_input(d.get("code", ""), 20).upper(),))
+    r = cur.fetchone()
+    return {"valid": True, "discount": r[0]} if r else {"valid": False}
 
 @app.get("/api/reviews/{pid}")
-def get_reviews(pid:int):
-    cur=conn.cursor(); cur.execute("SELECT name,rating,text,created FROM reviews WHERE product_id=? ORDER BY id DESC LIMIT 10",(pid,)); return [{"name":r[0],"rating":r[1],"text":r[2],"created":r[3]} for r in cur.fetchall()]
+def get_reviews(pid: int):
+    cur = conn.cursor()
+    cur.execute("SELECT name,rating,text,created FROM reviews WHERE product_id=? ORDER BY id DESC LIMIT 10", (pid,))
+    return [{"name": r[0], "rating": r[1], "text": r[2], "created": r[3]} for r in cur.fetchall()]
 
 @app.post("/api/reviews/add")
-async def add_review(req:Request):
-    d=await req.json()
-    try: pid=int(d.get("product_id",0)); rating=int(d.get("rating",5))
-    except: return {"status":"error"}
-    conn.execute("INSERT INTO reviews (product_id,name,rating,text,created) VALUES (?,?,?,?,?)",(pid,clean_input(d.get("name","Customer"),30),rating,clean_input(d.get("text",""),200),datetime.datetime.now().strftime("%Y-%m-%d"))); conn.commit()
-    return {"status":"ok"}
+async def add_review(req: Request):
+    d = await req.json()
+    try:
+        pid = int(d.get("product_id", 0))
+        rating = int(d.get("rating", 5))
+    except Exception:
+        return {"status": "error"}
+    conn.execute("INSERT INTO reviews (product_id,name,rating,text,created) VALUES (?,?,?,?,?)", (pid, clean_input(d.get("name", "Customer"), 30), rating, clean_input(d.get("text", ""), 200), datetime.datetime.now().strftime("%Y-%m-%d")))
+    conn.commit()
+    return {"status": "ok"}
 
 @app.post("/api/admin/check")
-async def admin_check(req:Request):
-    ip=req.client.host if req.client else "unknown"
-    if is_blocked(ip): return {"status":"blocked","message":"Too many tries. Wait 15 mins"}
-    d=await req.json()
-    if d.get("password","")==ADMIN_PASSWORD:
-        FAILED[ip]=[]; return {"status":"ok"}
-    record_fail(ip); return {"status":"error","message":"Wrong password"}
+async def admin_check(req: Request):
+    ip = req.client.host if req.client else "unknown"
+    if is_blocked(ip):
+        return {"status": "blocked", "message": "Too many tries. Wait 15 mins"}
+    d = await req.json()
+    if d.get("password", "") == ADMIN_PASSWORD:
+        FAILED[ip] = []
+        return {"status": "ok"}
+    record_fail(ip)
+    return {"status": "error", "message": "Wrong password"}
 
 @app.get("/api/admin/dashboard")
-def admin_dash(password:str=""):
-    if password!=ADMIN_PASSWORD: return {"error":"unauthorized"}
-    cur=conn.cursor()
-    cur.execute("SELECT COUNT(*), COALESCE(SUM(total),0) FROM orders"); o=cur.fetchone()
-    cur.execute("SELECT COUNT(*) FROM users"); u=cur.fetchone()
-    cur.execute("SELECT COUNT(*) FROM products"); p=cur.fetchone()
-    cur.execute("SELECT COUNT(*) FROM community_posts"); cp=cur.fetchone()
-    cur.execute("SELECT order_no,name,phone,total,status,created, COALESCE(pay_method,'M-Pesa') FROM orders ORDER BY id DESC LIMIT 30"); orders=[{"order_no":r[0],"name":r[1],"phone":r[2],"total":r[3],"status":r[4],"created":r[5],"pay_method":r[6]} for r in cur.fetchall()]
-    cur.execute("SELECT phone,name FROM users ORDER BY id DESC LIMIT 30"); customers=[{"phone":r[0],"name":r[1]} for r in cur.fetchall()]
+def admin_dash(password: str = ""):
+    if password != ADMIN_PASSWORD:
+        return {"error": "unauthorized"}
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*), COALESCE(SUM(total),0) FROM orders")
+    o = cur.fetchone()
+    cur.execute("SELECT COUNT(*) FROM users")
+    u = cur.fetchone()
+    cur.execute("SELECT COUNT(*) FROM products")
+    p = cur.fetchone()
+    cur.execute("SELECT COUNT(*) FROM community_posts")
+    cp = cur.fetchone()
+    cur.execute("SELECT order_no,name,phone,total,status,created, COALESCE(pay_method,'M-Pesa') FROM orders ORDER BY id DESC LIMIT 30")
+    orders = [{"order_no": r[0], "name": r[1], "phone": r[2], "total": r[3], "status": r[4], "created": r[5], "pay_method": r[6]} for r in cur.fetchall()]
+    cur.execute("SELECT phone,name FROM users ORDER BY id DESC LIMIT 30")
+    customers = [{"phone": r[0], "name": r[1]} for r in cur.fetchall()]
     for c in customers:
-        cur.execute("SELECT COUNT(*), COALESCE(SUM(total),0) FROM orders WHERE phone=?",(c["phone"],)); r=cur.fetchone(); c["orders"]=r[0]; c["spent"]=r[1]
-    cur.execute("SELECT id,name,price,stock,category FROM products ORDER BY stock ASC"); prods=[{"id":r[0],"name":r[1],"price":r[2],"stock":r[3],"category":r[4]} for r in cur.fetchall()]
-    return {"total_orders":o[0],"total_sales":o[1],"total_customers":u[0],"total_products":p[0],"total_posts":cp[0],"orders":orders,"customers":customers,"products":prods}
+        cur.execute("SELECT COUNT(*), COALESCE(SUM(total),0) FROM orders WHERE phone=?", (c["phone"],))
+        r = cur.fetchone()
+        c["orders"] = r[0]
+        c["spent"] = r[1]
+    cur.execute("SELECT id,name,price,stock,category FROM products ORDER BY stock ASC")
+    prods = [{"id": r[0], "name": r[1], "price": r[2], "stock": r[3], "category": r[4]} for r in cur.fetchall()]
+    return {"total_orders": o[0], "total_sales": o[1], "total_customers": u[0], "total_products": p[0], "total_posts": cp[0], "orders": orders, "customers": customers, "products": prods}
 
 @app.post("/api/admin/update_status")
-async def upd_status(req:Request):
-    d=await req.json()
-    if d.get("password")!=ADMIN_PASSWORD: return {"status":"error"}
-    conn.execute("UPDATE orders SET status=? WHERE order_no=?",(clean_input(d.get("status",""),20),clean_input(d.get("order_no",""),20))); conn.commit()
-    return {"status":"ok"}
+async def upd_status(req: Request):
+    d = await req.json()
+    if d.get("password") != ADMIN_PASSWORD:
+        return {"status": "error"}
+    conn.execute("UPDATE orders SET status=? WHERE order_no=?", (clean_input(d.get("status", ""), 20), clean_input(d.get("order_no", ""), 20)))
+    conn.commit()
+    return {"status": "ok"}
 
 @app.post("/api/admin/add_product")
-async def add_prod(req:Request):
-    d=await req.json()
-    if d.get("password")!=ADMIN_PASSWORD: return {"status":"error"}
-    cur=conn.cursor(); cur.execute("SELECT MAX(id) FROM products"); nid=(cur.fetchone()[0] or 0)+1
-    conn.execute("INSERT INTO products VALUES (?,?,?,?,?,?,?)",(nid,clean_input(d.get("name",""),80),int(d.get("price",0)),clean_input(d.get("code",""),20),d.get("image","LONMA|#0A9EBB"),clean_input(d.get("category",""),20),int(d.get("stock",0)))); conn.commit()
-    return {"status":"ok"}
+async def add_prod(req: Request):
+    d = await req.json()
+    if d.get("password") != ADMIN_PASSWORD:
+        return {"status": "error"}
+    cur = conn.cursor()
+    cur.execute("SELECT MAX(id) FROM products")
+    nid = (cur.fetchone()[0] or 0) + 1
+    conn.execute("INSERT INTO products VALUES (?,?,?,?,?,?,?)", (nid, clean_input(d.get("name", ""), 80), int(d.get("price", 0)), clean_input(d.get("code", ""), 20), d.get("image", "LONMA|#0A9EBB"), clean_input(d.get("category", ""), 20), int(d.get("stock", 0))))
+    conn.commit()
+    return {"status": "ok"}
 
 @app.post("/api/admin/delete_product")
-async def del_prod(req:Request):
-    d=await req.json()
-    if d.get("password")!=ADMIN_PASSWORD: return {"status":"error"}
-    conn.execute("DELETE FROM products WHERE id=?",(int(d.get("id",0)),)); conn.commit()
-    return {"status":"ok"}
+async def del_prod(req: Request):
+    d = await req.json()
+    if d.get("password") != ADMIN_PASSWORD:
+        return {"status": "error"}
+    conn.execute("DELETE FROM products WHERE id=?", (int(d.get("id", 0)),))
+    conn.commit()
+    return {"status": "ok"}
 
 @app.get("/api/customer/dashboard")
-def cust_dash(phone:str=""):
-    phone=clean_input(phone,15); cur=conn.cursor()
-    cur.execute("SELECT name FROM users WHERE phone=?",(phone,)); u=cur.fetchone()
-    cur.execute("SELECT order_no,total,status,created FROM orders WHERE phone=? ORDER BY id DESC",(phone,)); orders=[{"order_no":r[0],"total":r[1],"status":r[2],"created":r[3]} for r in cur.fetchall()]
-    total=sum(o["total"] for o in orders)
-    return {"name":u[0] if u else "Customer","phone":phone,"orders":orders,"total_orders":len(orders),"total_spent":total,"points":total//100}
+def cust_dash(phone: str = ""):
+    phone = clean_input(phone, 15)
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM users WHERE phone=?", (phone,))
+    u = cur.fetchone()
+    cur.execute("SELECT order_no,total,status,created FROM orders WHERE phone=? ORDER BY id DESC", (phone,))
+    orders = [{"order_no": r[0], "total": r[1], "status": r[2], "created": r[3]} for r in cur.fetchall()]
+    total = sum(o["total"] for o in orders)
+    return {"name": u[0] if u else "Customer", "phone": phone, "orders": orders, "total_orders": len(orders), "total_spent": total, "points": total // 100}
 
-def save_order(order_no,name,raw,area,loc,cart,amount,method):
-    conn.execute("INSERT INTO orders (order_no,name,phone,area,location,items,total,status,created,mpesa_receipt,checkout_id,pay_method) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",(order_no,name,raw,area,loc,json.dumps(cart)[:2000],amount,'Pending',datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),"",order_no,method)); conn.commit()
+def save_order(order_no, name, raw, area, loc, cart, amount, method):
+    conn.execute("INSERT INTO orders (order_no,name,phone,area,location,items,total,status,created,mpesa_receipt,checkout_id,pay_method) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (order_no, name, raw, area, loc, json.dumps(cart)[:2000], amount, 'Pending', datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "", order_no, method))
+    conn.commit()
 
 @app.post("/mpesa/stkpush")
-async def stk(req:Request):
-    d=await req.json(); raw=clean_input(d.get('phone',''),15); phone=raw.replace(" ","").replace("+254","0")
-    if phone.startswith("0"): phone="254"+phone[1:]
-    phone="".join([c for c in phone if c.isdigit()])
-    try: amount=int(d.get('amount',1))
-    except: amount=1
-    if amount<1 or amount>500000: return {"status":"error","message":"Invalid amount"}
-    if len(phone)!=12: return {"status":"error","message":"Invalid phone"}
-    if not USE_PROD:
-        # In sandbox, still allow but mark clearly - production must set DARAJA_ENV=production
-        pass
-    order_no='LONMA'+datetime.datetime.now().strftime("%H%M%S")
-    name=clean_input(d.get('name','Guest'),50); area=clean_input(d.get('area',''),20); loc=clean_input(d.get('location',''),100)
-    save_order(order_no,name,raw,area,loc,d.get('cart',[]),amount,'M-Pesa')
+async def stk(req: Request):
+    d = await req.json()
+    raw = clean_input(d.get('phone', ''), 15)
+    phone = raw.replace(" ", "").replace("+254", "0")
+    if phone.startswith("0"):
+        phone = "254" + phone[1:]
+    phone = "".join([c for c in phone if c.isdigit()])
+    try:
+        amount = int(d.get('amount', 1))
+    except Exception:
+        amount = 1
+    if amount < 1 or amount > 500000:
+        return {"status": "error", "message": "Invalid amount"}
+    if len(phone) != 12:
+        return {"status": "error", "message": "Invalid phone"}
+    order_no = 'LONMA' + datetime.datetime.now().strftime("%H%M%S")
+    name = clean_input(d.get('name', 'Guest'), 50)
+    area = clean_input(d.get('area', ''), 20)
+    loc = clean_input(d.get('location', ''), 100)
+    save_order(order_no, name, raw, area, loc, d.get('cart', []), amount, 'M-Pesa')
     if DARAJA_KEY and DARAJA_PASSKEY:
-        token=get_token()
+        token = get_token()
         if token:
-            ts=datetime.datetime.now().strftime("%Y%m%d%H%M%S"); pwd=base64.b64encode(f"{DARAJA_SHORTCODE}{DARAJA_PASSKEY}{ts}".encode()).decode()
-            payload={"BusinessShortCode":DARAJA_SHORTCODE,"Password":pwd,"Timestamp":ts,"TransactionType":"CustomerPayBillOnline","Amount":amount,"PartyA":phone,"PartyB":DARAJA_SHORTCODE,"PhoneNumber":phone,"CallBackURL":DARAJA_CALLBACK,"AccountReference":order_no,"TransactionDesc":order_no}
+            ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            pwd = base64.b64encode(f"{DARAJA_SHORTCODE}{DARAJA_PASSKEY}{ts}".encode()).decode()
+            payload = {"BusinessShortCode": DARAJA_SHORTCODE, "Password": pwd, "Timestamp": ts, "TransactionType": "CustomerPayBillOnline", "Amount": amount, "PartyA": phone, "PartyB": DARAJA_SHORTCODE, "PhoneNumber": phone, "CallBackURL": DARAJA_CALLBACK, "AccountReference": order_no, "TransactionDesc": order_no}
             try:
-                base="https://api.safaricom.co.ke" if USE_PROD else "https://sandbox.safaricom.co.ke"
-                r=requests.post(f"{base}/mpesa/stkpush/v1/processrequest",json=payload,headers={"Authorization":f"Bearer {token}"},timeout=15); res=r.json()
-                if res.get("ResponseCode")=="0":
-                    conn.execute("UPDATE orders SET checkout_id=? WHERE order_no=?",(res.get("CheckoutRequestID",order_no),order_no)); conn.commit()
-                    return {"status":"ok","message":f"M-Pesa STK sent to {raw}","order_no":order_no}
-            except: pass
-    return {"status":"ok","message":f"Order {order_no} saved - M-Pesa","order_no":order_no}
+                base = "https://api.safaricom.co.ke" if USE_PROD else "https://sandbox.safaricom.co.ke"
+                r = requests.post(f"{base}/mpesa/stkpush/v1/processrequest", json=payload, headers={"Authorization": f"Bearer {token}"}, timeout=15)
+                res = r.json()
+                if res.get("ResponseCode") == "0":
+                    conn.execute("UPDATE orders SET checkout_id=? WHERE order_no=?", (res.get("CheckoutRequestID", order_no), order_no))
+                    conn.commit()
+                    return {"status": "ok", "message": f"M-Pesa STK sent to {raw}", "order_no": order_no}
+            except Exception:
+                pass
+    return {"status": "ok", "message": f"Order {order_no} saved - M-Pesa", "order_no": order_no}
 
 @app.post("/airtel/stkpush")
-async def airtel_push(req:Request):
-    # PRODUCTION FIX: Block fake PAID if no real Airtel keys
+async def airtel_push(req: Request):
     if not AIRTEL_KEY or not AIRTEL_SECRET:
-        return {"status":"error","message":"Airtel Money is temporarily unavailable. Please use M-Pesa."}
-    d=await req.json(); raw=clean_input(d.get('phone',''),15); phone=raw.replace(" ","").replace("+254","0")
-    if phone.startswith("0"): phone="254"+phone[1:]
-    phone="".join([c for c in phone if c.isdigit()])
-    try: amount=int(d.get('amount',1))
-    except: amount=1
-    if len(phone)!=12: return {"status":"error","message":"Invalid Airtel number"}
-    order_no='LONMA'+datetime.datetime.now().strftime("%H%M%S")
-    name=clean_input(d.get('name','Guest'),50); area=clean_input(d.get('area',''),20); loc=clean_input(d.get('location',''),100)
-    save_order(order_no,name,raw,area,loc,d.get('cart',[]),amount,'Airtel Money')
-    # TODO: Add real Airtel Africa API call here with AIRTEL_KEY
-    return {"status":"ok","message":f"Airtel Money prompt sent to {raw}. Check phone and enter PIN. Order {order_no}","order_no":order_no}
+        return {"status": "error", "message": "Airtel Money is temporarily unavailable. Please use M-Pesa."}
+    d = await req.json()
+    raw = clean_input(d.get('phone', ''), 15)
+    phone = raw.replace(" ", "").replace("+254", "0")
+    if phone.startswith("0"):
+        phone = "254" + phone[1:]
+    phone = "".join([c for c in phone if c.isdigit()])
+    try:
+        amount = int(d.get('amount', 1))
+    except Exception:
+        amount = 1
+    if len(phone) != 12:
+        return {"status": "error", "message": "Invalid Airtel number"}
+    order_no = 'LONMA' + datetime.datetime.now().strftime("%H%M%S")
+    name = clean_input(d.get('name', 'Guest'), 50)
+    area = clean_input(d.get('area', ''), 20)
+    loc = clean_input(d.get('location', ''), 100)
+    save_order(order_no, name, raw, area, loc, d.get('cart', []), amount, 'Airtel Money')
+    return {"status": "ok", "message": f"Airtel Money prompt sent to {raw}. Check phone and enter PIN. Order {order_no}", "order_no": order_no}
 
 @app.post("/card/pay")
-async def card_pay(req:Request):
-    # PRODUCTION FIX: Block fake PAID if no Stripe key
+async def card_pay(req: Request):
     if not STRIPE_KEY:
-        return {"status":"error","message":"Card payment is temporarily unavailable. Please use M-Pesa."}
-    d=await req.json()
-    try: amount=int(d.get('amount',1))
-    except: amount=1
-    card_no=clean_input(d.get('card_no',''),19).replace(" ","")
-    if len(card_no)<15: return {"status":"error","message":"Invalid card number"}
-    if not d.get('expiry') or not d.get('cvv'): return {"status":"error","message":"Enter expiry and CVV"}
-    # PRODUCTION: Never log card_no / cvv. In real Stripe integration, use Stripe PaymentIntent on frontend, never send raw card to your server.
-    # This endpoint now requires STRIPE_KEY and should be replaced with Stripe PaymentIntent flow before public launch.
-    order_no='LONMA'+datetime.datetime.now().strftime("%H%M%S")
-    name=clean_input(d.get('name','Guest'),50); raw=clean_input(d.get('phone',''),15); area=clean_input(d.get('area',''),20); loc=clean_input(d.get('location',''),100)
-    # Do NOT mark PAID until Stripe confirms. Keep Pending for manual verification until Stripe webhook is added.
-    save_order(order_no,name,raw,area,loc,d.get('cart',[]),amount,'Card / Global Pay')
-    return {"status":"ok","message":f"Card payment received - pending confirmation. Order {order_no}","order_no":order_no}
+        return {"status": "error", "message": "Card payment is temporarily unavailable. Please use M-Pesa."}
+    d = await req.json()
+    try:
+        amount = int(d.get('amount', 1))
+    except Exception:
+        amount = 1
+    card_no = clean_input(d.get('card_no', ''), 19).replace(" ", "")
+    if len(card_no) < 15:
+        return {"status": "error", "message": "Invalid card number"}
+    if not d.get('expiry') or not d.get('cvv'):
+        return {"status": "error", "message": "Enter expiry and CVV"}
+    order_no = 'LONMA' + datetime.datetime.now().strftime("%H%M%S")
+    name = clean_input(d.get('name', 'Guest'), 50)
+    raw = clean_input(d.get('phone', ''), 15)
+    area = clean_input(d.get('area', ''), 20)
+    loc = clean_input(d.get('location', ''), 100)
+    save_order(order_no, name, raw, area, loc, d.get('cart', []), amount, 'Card / Global Pay')
+    return {"status": "ok", "message": f"Card payment received - pending confirmation. Order {order_no}", "order_no": order_no}
+
 @app.post("/api/auth/register")
-async def reg(req:Request):
-    d=await req.json(); phone=clean_input(d.get("phone",""),15); name=clean_input(d.get("name",""),50); pwd=d.get("password","").strip()[:50]
-    if len(phone)<10 or len(pwd)<4: return {"status":"error","message":"Invalid input"}
-    cur=conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?",(phone,))
-    if cur.fetchone(): return {"status":"error","message":"Account already exists. Please Sign In or use Forgot Password."}
-    cur.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)",(phone,name,hash_pw(pwd))); conn.commit()
-    return {"status":"ok","user":{"phone":phone,"name":name}}
-    return {"status":"ok","message":"Account created"}
+async def reg(req: Request):
+    d = await req.json()
+    phone = clean_input(d.get("phone", ""), 15)
+    name = clean_input(d.get("name", ""), 50)
+    pwd = d.get("password", "").strip()[:50]
+    if len(phone) < 10 or len(pwd) < 4:
+        return {"status": "error", "message": "Invalid input"}
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE phone=?", (phone,))
+    if cur.fetchone():
+        return {"status": "error", "message": "Account already exists. Please Sign In or use Forgot Password."}
+    cur.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)", (phone, name, hash_pw(pwd)))
+    conn.commit()
+    return {"status": "ok", "user": {"phone": phone, "name": name}, "message": "Account created"}
+
 @app.post("/api/auth/forgot")
 async def forgot(req: Request):
     d = await req.json()
-    phone = clean_input(d.get("phone",""), 15)
-    if len(phone) < 9:
-        return {"status":"error","message":"Enter valid phone number"}
-    cur = conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?", (phone,))
-    if not cur.fetchone():
-        return {"status":"ok","message":"If this number is registered, a code was sent"}
-    code = f"{random.randint(100000,999999)}"
-    otp_store[phone] = {"code": code, "expires": time.time()+600, "attempts": 0}
-    send_sms(normalize_phone(phone), f"Your LONMA ORBIT reset code is: {code}. Valid for 10 minutes. Do not share it.")
-    return {"status":"ok","message":"Code sent to your phone"}
+    phone = clean_input(d.get("phone", ""), 15)
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users WHERE phone=?", (phone,))
+    exists = cur.fetchone() is not None
+    if exists:
+        code = str(random.randint(100000, 999999))
+        expires = int(time.time()) + 600
+        conn.execute("INSERT OR REPLACE INTO password_resets VALUES (?,?,?)", (phone, code, expires))
+        conn.commit()
+        otp_store[phone] = {"code": code, "expires": time.time() + 600, "attempts": 0}
+        intl = phone
+        if intl.startswith("0"):
+            intl = "254" + intl[1:]
+        sent = send_sms(normalize_phone(intl), f"Your LONMA ORBIT reset code is: {code}. Valid for 10 minutes. Do not share it.")
+        if not sent and SHOW_RESET_CODE:
+            return {"status": "ok", "message": "Reset code sent via SMS. Check your phone.", "code": code, "debug": True}
+    return {"status": "ok", "message": "If an account exists with this phone, a reset code has been sent via SMS. Check your phone."}
 
 @app.post("/api/auth/forgot-reset")
-def forgot_reset(data: dict):
-    phone = str(data.get("phone", "")).strip()
-    code = str(data.get("code", "")).strip()
-    pwd = str(data.get("new_password", "") or data.get("password", ""))
+async def forgot_reset(req: Request):
+    d = await req.json()
+    phone = clean_input(str(d.get("phone", "")), 15)
+    code = str(d.get("code", "")).strip()
+    pwd = str(d.get("new_password", "") or d.get("password", "") or "").strip()
     if not phone or not code or not pwd:
         return {"status": "error", "message": "Missing fields"}
+    if len(pwd) < 4:
+        return {"status": "error", "message": "Password must be at least 4 characters"}
+    # Try DB first, then memory store
+    cur = conn.cursor()
+    cur.execute("SELECT code, expires FROM password_resets WHERE phone=?", (phone,))
+    row = cur.fetchone()
+    if row:
+        if not hmac.compare_digest(str(row[0]), str(code)):
+            return {"status": "error", "message": "Wrong code"}
+        if int(time.time()) > row[1]:
+            return {"status": "error", "message": "Code expired. Request a new code"}
+        conn.execute("UPDATE users SET password=? WHERE phone=?", (hash_pw(pwd), phone))
+        conn.execute("DELETE FROM password_resets WHERE phone=?", (phone,))
+        conn.commit()
+        otp_store.pop(phone, None)
+        return {"status": "ok", "message": "Password reset successful. Please Sign In"}
     otp = otp_store.get(phone)
     if not otp:
         return {"status": "error", "message": "No OTP found. Request a new code"}
     if time.time() > otp["expires"]:
-        del otp_store[phone]
+        otp_store.pop(phone, None)
         return {"status": "error", "message": "Code expired. Request a new code"}
     otp["attempts"] = otp.get("attempts", 0) + 1
     if otp["attempts"] > 5:
-        del otp_store[phone]
+        otp_store.pop(phone, None)
         return {"status": "error", "message": "Too many attempts. Request a new code"}
     if otp["code"] != code:
         return {"status": "error", "message": "Wrong code"}
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-    cur.execute("UPDATE users SET password=? WHERE phone=?", (hash_pw(pwd), phone))
+    conn.execute("UPDATE users SET password=? WHERE phone=?", (hash_pw(pwd), phone))
     conn.commit()
-    conn.close()
-    del otp_store[phone]
+    otp_store.pop(phone, None)
     return {"status": "ok", "message": "Password reset successful. Please Sign In"}
- @app.post("/api/auth/login")
-async def log(req:Request):
-    ip=req.client.host if req.client else "unknown"
-    if is_blocked(ip): return {"status":"error","message":"Too many tries. Wait 15 mins"}
-    d=await req.json(); phone=clean_input(d.get("phone",""),15); pw=d.get("password","").strip()[:50]
-    cur=conn.cursor(); cur.execute("SELECT phone,name,password FROM users WHERE phone=?",(phone,)); row=cur.fetchone()
-    if not row or not check_pw(pw, row[2]):
-        record_fail(ip); return {"status":"error","message":"Wrong"}
-    # Migrate legacy plain password to hash
-    if ":" not in (row[2] or ""):
-        conn.execute("UPDATE users SET password=? WHERE phone=?",(hash_pw(pw),phone)); conn.commit()
-    FAILED[ip]=[]; return {"status":"ok","user":{"phone":row[0],"name":row[1]}}
-
-@app.post("/api/auth/forgot")
-async def forgot(req:Request):
-    d=await req.json(); phone=clean_input(d.get("phone",""),15)
-    # Always return same message - do NOT reveal if account exists (prevents phone enumeration)
-    cur=conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?",(phone,))
-    exists = cur.fetchone() is not None
-    if exists:
-        code=str(random.randint(100000,999999))
-        expires=int(time.time())+600
-        conn.execute("INSERT OR REPLACE INTO password_resets VALUES (?,?,?)",(phone,code,expires)); conn.commit()
-        # Send SMS - never return code in production
-        intl = phone
-        if intl.startswith("0"): intl="254"+intl[1:]
-        sent = send_sms(intl, f"Your LONMA ORBIT reset code is {code}. Valid 10 mins. Do not share it.")
-        if not sent and SHOW_RESET_CODE:
-            # Testing only - when SHOW_RESET_CODE=true in Render
-            return {"status":"ok","message":"Reset code sent via SMS. Check your phone.","code":code,"debug":True}
-    # Generic message - same for exists / not exists
-    return {"status":"ok","message":"If an account exists with this phone, a reset code has been sent via SMS. Check your phone."}
 
 @app.post("/api/auth/reset")
-async def reset_pw(req:Request):
-    d=await req.json(); phone=clean_input(d.get("phone",""),15); code=clean_input(d.get("code",""),6); newpw=d.get("new_password","").strip()[:50]
-    if len(newpw)<4: return {"status":"error","message":"Password must be at least 4 characters"}
-    cur=conn.cursor(); cur.execute("SELECT code, expires FROM password_resets WHERE phone=?",(phone,)); row=cur.fetchone()
-    if not row: return {"status":"error","message":"No reset request found. Request a new code."}
-    if not hmac.compare_digest(str(row[0]), str(code)): return {"status":"error","message":"Wrong code"}
-    if int(time.time())>row[1]: return {"status":"error","message":"Code expired. Request a new code."}
-    conn.execute("UPDATE users SET password=? WHERE phone=?",(hash_pw(newpw),phone)); conn.execute("DELETE FROM password_resets WHERE phone=?",(phone,)); conn.commit()
-    return {"status":"ok","message":"Password reset successful. You can now Sign In."}
+async def reset_pw(req: Request):
+    d = await req.json()
+    phone = clean_input(d.get("phone", ""), 15)
+    code = clean_input(d.get("code", ""), 6)
+    newpw = d.get("new_password", "").strip()[:50]
+    if len(newpw) < 4:
+        return {"status": "error", "message": "Password must be at least 4 characters"}
+    cur = conn.cursor()
+    cur.execute("SELECT code, expires FROM password_resets WHERE phone=?", (phone,))
+    row = cur.fetchone()
+    if not row:
+        return {"status": "error", "message": "No reset request found. Request a new code."}
+    if not hmac.compare_digest(str(row[0]), str(code)):
+        return {"status": "error", "message": "Wrong code"}
+    if int(time.time()) > row[1]:
+        return {"status": "error", "message": "Code expired. Request a new code."}
+    conn.execute("UPDATE users SET password=? WHERE phone=?", (hash_pw(newpw), phone))
+    conn.execute("DELETE FROM password_resets WHERE phone=?", (phone,))
+    conn.commit()
+    return {"status": "ok", "message": "Password reset successful. You can now Sign In."}
+
+@app.post("/api/auth/login")
+async def log(req: Request):
+    ip = req.client.host if req.client else "unknown"
+    if is_blocked(ip):
+        return {"status": "error", "message": "Too many tries. Wait 15 mins"}
+    d = await req.json()
+    phone = clean_input(d.get("phone", ""), 15)
+    pw = d.get("password", "").strip()[:50]
+    cur = conn.cursor()
+    cur.execute("SELECT phone,name,password FROM users WHERE phone=?", (phone,))
+    row = cur.fetchone()
+    if not row or not check_pw(pw, row[2]):
+        record_fail(ip)
+        return {"status": "error", "message": "Wrong"}
+    if ":" not in (row[2] or ""):
+        conn.execute("UPDATE users SET password=? WHERE phone=?", (hash_pw(pw), phone))
+        conn.commit()
+    FAILED[ip] = []
+    return {"status": "ok", "user": {"phone": row[0], "name": row[1]}}
 
 HTML="""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>LONMA ORBIT - Online Supermarket</title><style>
 :root{--teal:#0A9EBB;--dark:#0F172A;--line:#E2E8F0;--muted:#64748B;--bg:#F8FAFC;--card:#FFFFFF;--text:#0F172A}*{box-sizing:border-box}body{margin:0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
