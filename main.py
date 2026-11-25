@@ -398,7 +398,7 @@ async def card_pay(req:Request):
     return {"status":"ok","message":f"Card payment received - pending confirmation. Order {order_no}","order_no":order_no}
 @app.post("/api/auth/register")
 async def reg(req:Request):
-    d=await req.json(); phone=clean_input(d.get("phone",""),15); name=clean_input(d.get("name",""),50); pwd=d.get("password","").strip()[:50]
+d=await req.json(); phone=clean_input(d.get("phone",""),15); name=clean_input(d.get("name",""),50); pwd=d.get("password","").strip()[:50]
 if len(phone)<10 or len(pwd)<4: return {"status":"error","message":"Invalid input"}
 cur=conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?",(phone,))
 if cur.fetchone(): return {"status":"error","message":"Account already exists. Please Sign In or use Forgot Password."}
