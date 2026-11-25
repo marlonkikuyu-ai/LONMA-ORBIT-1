@@ -444,31 +444,32 @@ async def forgot(req: Request):
     otp_store[phone] = {"code": code, "expires": time.time()+600, "attempts": 0}
     send_sms(normalize_phone(phone), f"Your LONMA ORBIT reset code is: {code}. Valid for 10 minutes. Do not share it.")
     return {"status":"ok","message":"Code sent to your phone"}
-
-@app.post("/api/auth/reset")
-async def reset_password(req: Request):
-    d = await req.json()
-    phone = clean_input(d.get("phone",""), 15)
-    code = str(d.get("code","")).strip()
-    pwd = d.get("password","").strip()
-    if len(pwd) < 4:
-        return {"status":"error","message":"Password must be at least 4 characters"}
+    @app.post("/api/auth/forgot-reset")
+def forgot_reset(data: dict):
+    phone = str(data.get("phone", "")).strip()
+    code = str(data.get("code", "")).strip()
+    pwd = str(data.get("new_password", "") or data.get("password", ""))
+    if not phone or not code or not pwd:
+        return {"status": "error", "message": "Missing fields"}
     otp = otp_store.get(phone)
     if not otp:
-        return {"status":"error","message":"No code requested. Tap 'Send Code' first"}
+        return {"status": "error", "message": "No OTP found. Request a new code"}
     if time.time() > otp["expires"]:
         del otp_store[phone]
-        return {"status":"error","message":"Code expired. Request a new one"}
-    otp["attempts"] += 1
+        return {"status": "error", "message": "Code expired. Request a new code"}
+    otp["attempts"] = otp.get("attempts", 0) + 1
     if otp["attempts"] > 5:
         del otp_store[phone]
-        return {"status":"error","message":"Too many attempts. Request a new code"}
+        return {"status": "error", "message": "Too many attempts. Request a new code"}
     if otp["code"] != code:
-        return {"status":"error","message":"Wrong code"}
-    cur = conn.cursor(); cur.execute("UPDATE users SET password=? WHERE phone=?", (hash_pw(pwd), phone))
+        return {"status": "error", "message": "Wrong code"}
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET password=? WHERE phone=?", (hash_pw(pwd), phone))
     conn.commit()
+    conn.close()
     del otp_store[phone]
-    return {"status":"ok","message":"Password reset successful. Please Sign In"}
+    return {"status": "ok", "message": "Password reset successful. Please Sign In"}
  @app.post("/api/auth/login")
 async def log(req:Request):
     ip=req.client.host if req.client else "unknown"
