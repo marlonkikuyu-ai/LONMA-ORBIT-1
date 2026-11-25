@@ -469,10 +469,7 @@ async def reset_password(req: Request):
     conn.commit()
     del otp_store[phone]
     return {"status":"ok","message":"Password reset successful. Please Sign In"}
-@app.post("/api/auth/login")
-async def login(req: Request):
-
-app.post("/api/auth/login")
+ @app.post("/api/auth/login")
 async def log(req:Request):
     ip=req.client.host if req.client else "unknown"
     if is_blocked(ip): return {"status":"error","message":"Too many tries. Wait 15 mins"}
