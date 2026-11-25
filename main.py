@@ -239,7 +239,7 @@ async def create_post(req: Request):
     phone = clean_input(d.get("phone", ""), 15)
     if not text or len(text) < 2:
         return {"status": "error"}
-    conn.execute("INSERT INTO community_posts (author,phone,text,image,likes,reposts,created) VALUES (?,?,?,?,0,0,?)", (author, phone, text, "", datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
+    img = str(d.get("image",""))[:200000] conn.execute("INSERT INTO community_posts (author,phone,text,image,likes,reposts,created) VALUES (?,?,?,?,0,0,?)", (author, phone, text, img, datetime.datetime.now().strftime("%Y-%m-%d %H:%M")))
     conn.commit()
     return {"status": "ok"}
 
