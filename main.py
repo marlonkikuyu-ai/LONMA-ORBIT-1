@@ -431,9 +431,6 @@ async def reg(req:Request):
     cur.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)",(phone,name,hash_pw(pwd))); conn.commit()
     return {"status":"ok","user":{"phone":phone,"name":name}}
     return {"status":"ok","message":"Account created"}
-
-@app.post("/api/auth/forgot")
-async def forgot(req: Request):
 @app.post("/api/auth/forgot")
 async def forgot(req: Request):
     d = await req.json()
