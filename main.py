@@ -443,7 +443,8 @@ async def forgot(req: Request):
     code = f"{random.randint(100000,999999)}"
     otp_store[phone] = {"code": code, "expires": time.time()+600, "attempts": 0}
     send_sms(normalize_phone(phone), f"Your LONMA ORBIT reset code is: {code}. Valid for 10 minutes. Do not share it.")
-        return {"status":"ok","message":"Code sent to your phone"}
+    return {"status":"ok","message":"Code sent to your phone"}
+
 @app.post("/api/auth/forgot-reset")
 def forgot_reset(data: dict):
     phone = str(data.get("phone", "")).strip()
