@@ -754,17 +754,29 @@ async def signup_alias(req: Request):
 async def signin_alias(req: Request):
     return await log(req)
 @app.post("/api/auth/forgot-password")
+@app.post("/api/forgot-password")
 async def forgot_pw(req: Request):
-    d = await req.json()
-    email = clean_input(d.get("email",""), 100).lower()
-    newpw = d.get("password","").strip()[:50]
+    try:
+        d = await req.json()
+    except:
+        return {"status":"error","message":"Invalid data"}
+    email = str(d.get("email","")).strip().lower()[:100]
+    newpw = str(d.get("password","")).strip()[:50]
     if not email or "@" not in email or len(newpw) < 4:
         return {"status":"error","message":"Enter valid email and new password min 4 chars"}
-    cur = conn.cursor()
-    cur.execute("SELECT id FROM users WHERE email=? OR phone=?", (email, email))
-    row = cur.fetchone()
-    if not row:
-        return {"status":"error","message":"No account found for this email. Please Create Account first."}
-    cur.execute("UPDATE users SET password=? WHERE id=?", (hash_pw(newpw), row[0]))
-    conn.commit()
-    return {"status":"ok","message":"Password reset"}
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM users WHERE email=? OR phone=?", (email, email))
+        row = cur.fetchone()
+        if not row:
+            return {"status":"error","message":"No account found for this email. Please Create Account first."}
+        try:
+            hp = hash_pw(newpw)
+        except:
+            hp = newpw
+        cur.execute("UPDATE users SET password=? WHERE id=?", (hp, row[0]))
+        conn.commit()
+        return {"status":"ok","message":"Password reset"}
+    except Exception as e:
+        print("FORGOT ERROR:", e)
+        return {"status":"error","message":"Server error: "+str(e)}
