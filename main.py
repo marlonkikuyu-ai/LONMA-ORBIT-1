@@ -398,12 +398,12 @@ async def card_pay(req:Request):
     return {"status":"ok","message":f"Card payment received - pending confirmation. Order {order_no}","order_no":order_no}
 @app.post("/api/auth/register")
 async def reg(req:Request):
-d=await req.json(); phone=clean_input(d.get("phone",""),15); name=clean_input(d.get("name",""),50); pwd=d.get("password","").strip()[:50]
-if len(phone)<10 or len(pwd)<4: return {"status":"error","message":"Invalid input"}
-cur=conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?",(phone,))
-if cur.fetchone(): return {"status":"error","message":"Account already exists. Please Sign In or use Forgot Password."}
-cur.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)",(phone,name,hash_pw(pwd))); conn.commit()
-return {"status":"ok","user":{"phone":phone,"name":name}}
+    d=await req.json(); phone=clean_input(d.get("phone",""),15); name=clean_input(d.get("name",""),50); pwd=d.get("password","").strip()[:50]
+    if len(phone)<10 or len(pwd)<4: return {"status":"error","message":"Invalid input"}
+    cur=conn.cursor(); cur.execute("SELECT id FROM users WHERE phone=?",(phone,))
+    if cur.fetchone(): return {"status":"error","message":"Account already exists. Please Sign In or use Forgot Password."}
+    cur.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)",(phone,name,hash_pw(pwd))); conn.commit()
+    return {"status":"ok","user":{"phone":phone,"name":name}}
 @app.post("/api/auth/login")
 async def log(req:Request):
     ip=req.client.host if req.client else "unknown"
