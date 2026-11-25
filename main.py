@@ -4,7 +4,33 @@ from fastapi.middleware.cors import CORSMiddleware
 import os, sqlite3, json, datetime, requests, base64, time, re, random, hashlib, hmac, secrets
 from threading import Thread
 from collections import defaultdict
+# --- SMS OTP FOR ALL USERS ---
+AT_USERNAME = os.environ.get("AT_USERNAME", "sandbox")
+AT_API_KEY = os.environ.get("AT_API_KEY", "")
+AT_SENDER = os.environ.get("AT_SENDER", "LONMA")
+otp_store = {}
 
+def send_sms(phone, message):
+    if not AT_API_KEY:
+        print(f"[OTP DEBUG] To {phone}: {message}")
+        return True
+    try:
+        r = requests.post("https://api.africastalking.com/version1/messaging",
+            data={"username": AT_USERNAME, "to": phone, "message": message, "from": AT_SENDER},
+            headers={"apiKey": AT_API_KEY, "Accept": "application/json"}, timeout=15)
+        print("SMS sent:", r.text[:200])
+        return True
+    except Exception as e:
+        print("SMS FAILED:", e)
+        return False
+
+def normalize_phone(phone):
+    phone = "".join(c for c in str(phone) if c.isdigit())
+    if len(phone) == 9 and phone.startswith("7"):
+        phone = "254" + phone
+    if len(phone) == 10 and phone.startswith("0"):
+        phone = "254" + phone[1:]
+    return "+" + phone
 app = FastAPI()
 # auth.py DISABLED - user auth is now in main.py only, to avoid duplicate routes
 @app.get("/login.html")
