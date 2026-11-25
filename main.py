@@ -766,7 +766,7 @@ async def forgot_pw(req: Request):
         return {"status":"error","message":"Enter valid email and new password min 4 chars"}
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id FROM users WHERE email=? OR phone=?", (email, email))
+        cur.execute("SELECT id FROM users WHERE phone=?", (email,))
         row = cur.fetchone()
         if not row:
             return {"status":"error","message":"No account found for this email. Please Create Account first."}
