@@ -1,10 +1,13 @@
 from fastapi import FastAPI, Request, HTTPException, Depends
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os, sqlite3, json, datetime, requests, base64, time, re, random, hashlib, hmac, secrets
 from threading import Thread
 from collections import defaultdict
-
+import urllib.parse
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "648502618142-9thjq2hi7kupj...apps.googleusercontent.com")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "PASTE-YOUR-SECRET-HERE")
+GOOGLE_REDIRECT_URI = "https://app.lonmaorbit.co.ke/auth/callback"
 # --- SMS OTP FOR ALL USERS ---
 AT_USERNAME = os.environ.get("AT_USERNAME", "sandbox")
 AT_API_KEY = os.environ.get("AT_API_KEY", "")
