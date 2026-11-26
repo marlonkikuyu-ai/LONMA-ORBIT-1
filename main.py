@@ -10,7 +10,7 @@ GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "GOCSPX-...")
 GOOGLE_REDIRECT_URI = "https://app.lonmaorbit.co.ke/auth/callback"
 
 app = FastAPI()
-
+DB_PATH = os.path.join(os.path.dirname(__file__), "lonma.db")
 @app.get("/auth/google")
 def google_login():
     ...
