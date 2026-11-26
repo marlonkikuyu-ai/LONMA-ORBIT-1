@@ -80,6 +80,14 @@ def normalize_phone(phone):
 
 app = FastAPI()
 
+@app.get("/auth/google")
+def google_login():
+    ...
+
+@app.get("/auth/callback")
+def google_callback(code: str = ""):
+    ...
+
 @app.get("/login.html")
 async def login_page():
     return FileResponse("login.html")
