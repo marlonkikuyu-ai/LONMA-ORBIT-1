@@ -6,77 +6,8 @@ from threading import Thread
 from collections import defaultdict
 import urllib.parse
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "648502618142-9thjq2hi7kupj...apps.googleusercontent.com")
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "PASTE-YOUR-SECRET-HERE")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "GOCSPX-...")
 GOOGLE_REDIRECT_URI = "https://app.lonmaorbit.co.ke/auth/callback"
-
-@app.get("/auth/google")
-def google_login():
-    params = {
-        "client_id": GOOGLE_CLIENT_ID,
-        "redirect_uri": GOOGLE_REDIRECT_URI,
-        "response_type": "code",
-        "scope": "openid email profile",
-        "access_type": "offline",
-        "prompt": "consent"
-    }
-    url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
-    return RedirectResponse(url)
-
-@app.get("/auth/callback")
-def google_callback(code: str = ""):
-    if not code:
-        return {"error": "Google login failed - no code"}
-    data = {
-        "client_id": GOOGLE_CLIENT_ID,
-        "client_secret": GOOGLE_CLIENT_SECRET,
-        "code": code,
-        "grant_type": "authorization_code",
-        "redirect_uri": GOOGLE_REDIRECT_URI
-    }
-    tok = requests.post("https://oauth2.googleapis.com/token", data=data).json()
-    user = requests.get("https://www.googleapis.com/oauth2/v3/userinfo",
-        headers={"Authorization": f"Bearer {tok.get('access_token')}"}).json()
-    resp = RedirectResponse("/", status_code=302)
-    resp.set_cookie("lonma_user", json.dumps({"name": user.get("name"), "email": user.get("email"), "picture": user.get("picture")}), max_age=86400*30)
-    return resp
-# --- SMS OTP FOR ALL USERS ---
-AT_USERNAME = os.environ.get("AT_USERNAME", "sandbox")
-AT_API_KEY = os.environ.get("AT_API_KEY", "")
-AT_SENDER = os.environ.get("AT_SENDER", "LONMA")
-SMS_API_KEY = os.getenv("SMS_API_KEY", "")
-SMS_USERNAME = os.getenv("SMS_USERNAME", "")
-SMS_SENDER = os.getenv("SMS_SENDER", "LONMA")
-otp_store = {}
-DB_PATH = "lonma.db"
-
-def send_sms(phone, message):
-    # Try SMS_API_KEY first, then AT_API_KEY
-    api_key = SMS_API_KEY or AT_API_KEY
-    username = SMS_USERNAME or AT_USERNAME
-    sender = SMS_SENDER or AT_SENDER
-    if not api_key:
-        print(f"[OTP DEBUG] To {phone}: {message}")
-        return True
-    try:
-        r = requests.post(
-            "https://api.africastalking.com/version1/messaging",
-            data={"username": username, "to": phone, "message": message, "from": sender},
-            headers={"apiKey": api_key, "Accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"},
-            timeout=15,
-        )
-        print("SMS sent:", r.text[:200])
-        return r.status_code in (200, 201)
-    except Exception as e:
-        print("SMS FAILED:", e)
-        return False
-
-def normalize_phone(phone):
-    phone = "".join(c for c in str(phone) if c.isdigit())
-    if len(phone) == 9 and phone.startswith("7"):
-        phone = "254" + phone
-    if len(phone) == 10 and phone.startswith("0"):
-        phone = "254" + phone[1:]
-    return "+" + phone
 
 app = FastAPI()
 
