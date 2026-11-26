@@ -928,6 +928,7 @@ function logout(){localStorage.removeItem('lonma_user');document.getElementById(
 document.getElementById('area')?.addEventListener('change',renderCart);
 applyAppear(); loadHealth(); loadP();updateCount();loadCustomerDashboard();
 </script></body></html>
+<script>setInterval(()=>{let t=document.querySelector('textarea[placeholder*="Share deals"]');if(!t||document.getElementById('commActions'))return;let d=document.createElement('div');d.id='commActions';d.innerHTML='<button onclick="alert(\'Live coming\')" style="background:#FEE2E2;color:#DC2626;border:0;padding:8px 12px;border-radius:20px;font-size:12px;font-weight:700">🔴 Live Video</button> <button onclick="document.getElementById(\'commPhoto\').click()" style="background:#E0F2FE;color:#0369A1;border:0;padding:8px 12px;border-radius:20px;font-size:12px;font-weight:700">🖼️ Photo</button> <button onclick="let n=prompt(\'Friend name:\');if(n)alert(\'Friends with \'+n)" style="background:#FEF3C7;color:#92400E;border:0;padding:8px 12px;border-radius:20px;font-size:12px;font-weight:700">👥 Add Friends</button><input type=file id=commPhoto hidden accept=image/*>';t.parentNode.insertBefore(d,t.nextSibling)},1000)</script>
 """
 
 @app.api_route("/",methods=["GET","HEAD"])
