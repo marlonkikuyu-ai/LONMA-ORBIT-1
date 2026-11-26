@@ -8,6 +8,37 @@ import urllib.parse
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "648502618142-9thjq2hi7kupj...apps.googleusercontent.com")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "PASTE-YOUR-SECRET-HERE")
 GOOGLE_REDIRECT_URI = "https://app.lonmaorbit.co.ke/auth/callback"
+
+@app.get("/auth/google")
+def google_login():
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "consent"
+    }
+    url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+    return RedirectResponse(url)
+
+@app.get("/auth/callback")
+def google_callback(code: str = ""):
+    if not code:
+        return {"error": "Google login failed - no code"}
+    data = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "code": code,
+        "grant_type": "authorization_code",
+        "redirect_uri": GOOGLE_REDIRECT_URI
+    }
+    tok = requests.post("https://oauth2.googleapis.com/token", data=data).json()
+    user = requests.get("https://www.googleapis.com/oauth2/v3/userinfo",
+        headers={"Authorization": f"Bearer {tok.get('access_token')}"}).json()
+    resp = RedirectResponse("/", status_code=302)
+    resp.set_cookie("lonma_user", json.dumps({"name": user.get("name"), "email": user.get("email"), "picture": user.get("picture")}), max_age=86400*30)
+    return resp
 # --- SMS OTP FOR ALL USERS ---
 AT_USERNAME = os.environ.get("AT_USERNAME", "sandbox")
 AT_API_KEY = os.environ.get("AT_API_KEY", "")
