@@ -837,7 +837,7 @@ function avatarLetter(name){return (name||'L').charAt(0).toUpperCase();}
 async function loadHealth(){
   try{ let r=await fetch('/api/health'); health=await r.json();
     let warn=document.getElementById('prodWarning'); let badge=document.getElementById('prodBadge');
-    if(health.mpesa_env!=='production'){ if(warn){ warn.style.display='block'; warn.innerText='⚠️ TEST MODE: M-Pesa is in Sandbox. Set DARAJA_ENV=production in Render for real payments.'; } if(badge){ badge.innerHTML='<span class="prod-badge">TEST MODE - M-Pesa Sandbox</span>'; } }
+    if(health.mpesa_env!=='production'){ if(warn){ warn.style.display='block'; warn.innerText='⚠️ TEST MODE: M-Pesa is in Sandbox. Set DARAJA_ENV=production in Render for real payments.'; } if(badge){ badge.innerHTML='<span class="prod-badge"></span>'; } }
     else { if(badge) badge.innerHTML='<span class="prod-badge" style="background:#DCFCE7;color:#166534">LIVE - M-Pesa Production</span>'; }
     // Disable pay cards if not configured
     if(!health.airtel_configured){ let c=document.getElementById('payAirtel'); if(c) c.classList.add('disabled'); let l=document.getElementById('airtelLabel'); if(l) l.innerText='Temporarily Unavailable'; }
