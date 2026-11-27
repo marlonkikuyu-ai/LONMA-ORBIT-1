@@ -1079,3 +1079,71 @@ def community_page():
             return HTMLResponse(f.read())
     except:
         return HTMLResponse("<h2>Community page not found - upload static/community.html</h2>")
+# ===== COMMUNITY FULL BACKEND =====
+import json, time
+COMMUNITY_FILE = "community_data.json"
+def _load_comm():
+    try:
+        with open(COMMUNITY_FILE) as f: return json.load(f)
+    except: return {"posts":[],"rooms":[],"chats":[],"follows":[],"likes":[],"notifs":[]}
+def _save_comm(d):
+    with open(COMMUNITY_FILE,"w") as f: json.dump(d,f)
+def _notify(to_phone, msg):
+    d=_load_comm(); d["notifs"].append({"phone":to_phone,"message":msg,"time":time.time()}); _save_comm(d)
+
+@app.get("/community")
+def community_page():
+    try:
+        with open("static/community.html") as f: return HTMLResponse(f.read())
+    except: return HTMLResponse("<h2>Upload static/community.html</h2>")
+
+@app.get("/api/community/posts")
+def get_posts(phone: str = ""):
+    d=_load_comm(); return {"posts": list(reversed(d["posts"]))}
+@app.post("/api/community/posts")
+async def create_post(req: Request):
+    b=await req.json(); d=_load_comm()
+    p={"id":str(int(time.time()*1000)),"phone":b.get("phone"),"name":b.get("phone"),"content":b.get("content",""),"photo":b.get("photo",""),"image_url":b.get("image_url","") or b.get("photo",""),"likes":0,"created_at":time.strftime("%Y-%m-%d %H:%M")}
+    d["posts"].append(p); _save_comm(d)
+    # notify followers
+    for f in d["follows"]:
+        if f.get("friend_phone")==p["phone"]: _notify(f.get("phone"), f"{p['phone']} posted: {p['content'][:60]}")
+    return {"ok":True,"post":p}
+@app.post("/api/community/like")
+async def like_post(req: Request):
+    b=await req.json(); d=_load_comm()
+    for p in d["posts"]:
+        if str(p["id"])==str(b.get("post_id")): p["likes"]=p.get("likes",0)+1; _notify(p["phone"], f"{b.get('phone')} liked your post")
+    _save_comm(d); return {"ok":True}
+@app.post("/api/friends/follow")
+async def follow_user(req: Request):
+    b=await req.json(); d=_load_comm()
+    d["follows"].append({"phone":b.get("phone"),"friend_phone":b.get("friend_phone")}); _save_comm(d)
+    _notify(b.get("friend_phone"), f"{b.get('phone')} started following you")
+    return {"ok":True}
+@app.get("/api/friends/search")
+def search_friends(q: str = "", phone: str = ""):
+    # search in existing posts users + fallback
+    d=_load_comm(); users={}
+    for p in d["posts"]: users[p["phone"]]={"phone":p["phone"],"name":p["phone"]}
+    out=[u for u in users.values() if q.lower() in u["phone"].lower()]
+    return {"users": out}
+@app.get("/api/friends/feed")
+def friends_feed(phone: str = ""):
+    d=_load_comm(); fr=[f["friend_phone"] for f in d["follows"] if f["phone"]==phone]
+    return {"posts":[p for p in reversed(d["posts"]) if p["phone"] in fr]}
+@app.get("/api/live/rooms")
+def live_rooms(): d=_load_comm(); return {"rooms": d["rooms"]}
+@app.post("/api/live/create")
+async def live_create(req: Request):
+    b=await req.json(); d=_load_comm(); r={"id":str(int(time.time())),"title":b.get("title","Live Room"),"host":b.get("phone"),"name":b.get("title","Live Room")}
+    d["rooms"].append(r); _save_comm(d); return {"ok":True,"id":r["id"]}
+@app.get("/api/live/chat")
+def live_chat(room_id: str = ""):
+    d=_load_comm(); return {"messages":[c for c in d["chats"] if str(c.get("room_id"))==str(room_id)]}
+@app.post("/api/live/chat")
+async def live_chat_post(req: Request):
+    b=await req.json(); d=_load_comm(); d["chats"].append({"room_id":b.get("room_id"),"phone":b.get("phone"),"text":b.get("text","")}); _save_comm(d); return {"ok":True}
+@app.get("/api/notifications")
+def notifications(phone: str = ""):
+    d=_load_comm(); return {"notifications": [n for n in reversed(d["notifs"]) if n.get("phone")==phone][:20]}
