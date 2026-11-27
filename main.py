@@ -48,7 +48,12 @@ def google_callback(code: str = ""):
     if not cur.fetchone():
         conn.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)", (email, name, hash_pw(secrets.token_hex(8))))
         conn.commit()
-    return RedirectResponse(f"/home?google_user={urllib.parse.quote(email)}&name={urllib.parse.quote(name)}")
+   import secrets
+from auth import SESSIONS
+
+token = secrets.token_hex(16)
+SESSIONS[token] = {"id": email, "name": name, "email": email, "phone": ""}
+return RedirectResponse(f"/home?token={token}")
 
 @app.get("/login.html")
 async def login_page():
