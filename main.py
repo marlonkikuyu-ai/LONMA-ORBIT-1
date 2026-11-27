@@ -224,7 +224,7 @@ async def callback(request: Request):
         return {"ResultCode": 0, "ResultDesc": "Accepted"}
 @app.get("/api/community/posts")
 def get_posts(phone: str = ""):
-    conn = sqlite3.connect(DB)
+    conn = conn = sqlite3.connect(DB_PATH)(DB)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     cur.execute("SELECT id, phone AS author, phone, text, image, likes, reposts, created FROM community_posts ORDER BY id DESC LIMIT 50")
