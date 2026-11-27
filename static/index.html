@@ -1,16 +1,10 @@
 <body>
 <style>body{visibility:hidden}</style>
 <script>
-  const _p = new URLSearchParams(location.search);
-const _gu = _p.get('google_user');
-if(_gu){
-  try{
-    const _d = JSON.parse(decodeURIComponent(_gu));
-    if(_d.token) localStorage.setItem('token', _d.token);
-    if(_d.user) localStorage.setItem('user', JSON.stringify(_d.user));
-    else if(_d.email) localStorage.setItem('user', JSON.stringify(_d));
-    if(!_d.token && typeof _gu === 'string' && _gu.length > 20) localStorage.setItem('token', _gu);
-  }catch(e){ localStorage.setItem('token', _gu); }
+ const _p = new URLSearchParams(location.search);
+const _t = _p.get('token');
+if (_t) {
+  localStorage.setItem('token', _t);
   history.replaceState({}, '', '/');
 }
 async function forceCheck(){
