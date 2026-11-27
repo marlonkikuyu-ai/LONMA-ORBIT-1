@@ -164,7 +164,7 @@ conn.execute("CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCR
 conn.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, phone TEXT UNIQUE, name TEXT, password TEXT)")
 conn.execute("CREATE TABLE IF NOT EXISTS password_resets (phone TEXT PRIMARY KEY, code TEXT, expires INTEGER)")
 conn.execute("CREATE TABLE IF NOT EXISTS reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER, name TEXT, rating INTEGER, text TEXT, created TEXT)")
-conn.execute("CREATE TABLE IF NOT EXISTS promos (code TEXT PRIMARY KEY, discount INTEGER)")
+conn.execute("CREATE TABLE IF NOT EXISTS s (code TEXT PRIMARY KEY, discount INTEGER)")
 conn.execute("CREATE TABLE IF NOT EXISTS _posts (id INTEGER PRIMARY KEY AUTOINCREMENT, author TEXT, phone TEXT, text TEXT, image TEXT, likes INTEGER DEFAULT 0, reposts INTEGER DEFAULT 0, created TEXT)")
 conn.execute("CREATE TABLE IF NOT EXISTS community_comments (id INTEGER PRIMARY KEY AUTOINCREMENT, post_id INTEGER, author TEXT, text TEXT, created TEXT)")
 conn.execute("CREATE TABLE IF NOT EXISTS community_likes (post_id INTEGER, phone TEXT, UNIQUE(post_id, phone))")
