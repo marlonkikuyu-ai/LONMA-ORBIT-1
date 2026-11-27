@@ -1147,3 +1147,14 @@ async def live_chat_post(req: Request):
 @app.get("/api/notifications")
 def notifications(phone: str = ""):
     d=_load_comm(); return {"notifications": [n for n in reversed(d["notifs"]) if n.get("phone")==phone][:20]}
+# ===== AUTO ADD COMMUNITY BUTTON TO HOME =====
+try:
+    COMMUNITY_BTN = '<a href="/community" style="background:#ea580c;color:#fff;padding:10px 16px;border-radius:999px;text-decoration:none;font-weight:700;display:inline-block;margin:8px;">🧡 Community</a>'
+    # Try to inject after <body> if HTML exists
+    if "HTML" in globals():
+        if "<body>" in HTML:
+            HTML = HTML.replace("<body>", "<body>" + COMMUNITY_BTN, 1)
+        else:
+            HTML = COMMUNITY_BTN + HTML
+except Exception as e:
+    print("Community btn inject failed:", e)
