@@ -222,28 +222,16 @@ async def callback(request: Request):
         return {"ResultCode": 0, "ResultDesc": "Accepted"}
     except Exception:
         return {"ResultCode": 0, "ResultDesc": "Accepted"}
-
-@app.get("/api/health")
-def health():
-    return {"status": "ok", "mpesa_env": "production" if USE_PROD else "sandbox", "mpesa_configured": bool(DARAJA_KEY and DARAJA_PASSKEY), "airtel_configured": bool(AIRTEL_KEY), "card_configured": bool(STRIPE_KEY), "sms_configured": bool(SMS_API_KEY or AT_API_KEY), "show_reset_code": SHOW_RESET_CODE}
-
 @app.get("/api/community/posts")
-@app.get("/api/community/posts") def get_posts():     conn = sqlite3.connect(DB)     conn.row_factory = sqlite3.Row     cur = conn.cursor()     cur.execute("PRAGMA table_info(community_posts)")     cols = [r[1] for r in cur.fetchall()]     if "author" not in cols:         try:             cur.execute("ALTER TABLE community_posts ADD COLUMN author TEXT DEFAULT 'User'")             conn.commit()             cols.append("author")         except Exception:             pass     cur.execute("PRAGMA table_info(community_posts)")     cols = [r[1] for r in cur.fetchall()]     want = ["id", "author", "phone", "text", "image", "likes", "reposts", "created"]     have = [c for c in want if c in cols]     cur.execute(f"SELECT {','.join(have)} FROM community_posts ORDER BY id DESC LIMIT 50")     rows = [dict(r) for r in cur.fetchall()]     for r in rows:         if "author" not in r:             r["author"] = r.get("phone", "User")         if "likes" not in r:             r["likes"] = 0         if "reposts" not in r:             r["reposts"] = 0     conn.close()     return rows(phone: str = ""):
+def get_posts(phone: str = ""):
+    conn = sqlite3.connect(DB)
+    conn.row_factory = sqlite3.Row
     cur = conn.cursor()
-    cur.execute("SELECT id,author,phone,text,image,likes,reposts,created FROM community_posts ORDER BY id DESC LIMIT 50")
-    out = []
-    for r in cur.fetchall():
-        cur2 = conn.cursor()
-        cur2.execute("SELECT COUNT(*) FROM community_comments WHERE post_id=?", (r[0],))
-        cc = cur2.fetchone()[0]
-        liked = False
-        if phone:
-            cur2.execute("SELECT 1 FROM community_likes WHERE post_id=? AND phone=?", (r[0], phone))
-            liked = cur2.fetchone() is not None
-        out.append({"id": r[0], "author": r[1], "phone": r[2], "text": r[3], "image": r[4], "likes": r[5], "reposts": r[6], "created": r[7], "comments": cc, "liked": liked})
-    return out
-# --- FRIENDS / PHOTOS / LIVE ---
-# Follows stored in DB so they survive redeploy
+    cur.execute("SELECT id, phone AS author, phone, text, image, likes, reposts, created FROM community_posts ORDER BY id DESC LIMIT 50")
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+    # Follows stored in DB so they survive redeploy
 try:
     conn.execute("CREATE TABLE IF NOT EXISTS community_follows (follower TEXT, following TEXT, UNIQUE(follower, following))")
     conn.commit()
