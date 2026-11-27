@@ -830,7 +830,7 @@ function logoPress(){
 }
 function openMenu(){document.getElementById('side').classList.add('open');document.getElementById('overlay').classList.add('open');}
 function closeMenu(){document.getElementById('side').classList.remove('open');document.getElementById('overlay').classList.remove('open');}
-function openWA(){let msg=encodeURIComponent('Hi LONMA ORBIT. I want to order.');window.open('https://wa.me/254700000000?text='+msg,'_blank');}
+function openWA(){let msg=encodeURIComponent('Hi LONMA ORBIT. I want to order.');window.open('https://wa.me/254?text='+msg,'_blank');}
 function orderViaWA(){let txt='Hi LONMA. I want to order:\\n';for(let i of cart)txt+=i.name+' x'+i.qty+' = KSh '+(i.price*i.qty)+'\\n';txt+='Total: KSh '+document.getElementById('tot').innerText;window.open('https://wa.me/254700000000?text='+encodeURIComponent(txt),'_blank');}
 function getUser(){try{return JSON.parse(localStorage.getItem('lonma_user')||'null');}catch(e){return null;}}
 function formatText(t){return t.replace(/#(\\w+)/g,'<span class="hashtag">#$1</span>');}
