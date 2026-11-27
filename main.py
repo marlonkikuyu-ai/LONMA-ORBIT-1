@@ -179,9 +179,9 @@ cur.execute("INSERT OR IGNORE INTO promos VALUES ('LONMA10',10)")
 cur.execute("INSERT OR IGNORE INTO promos VALUES ('WELCOME20',20)")
 PRODS = [
     (1, "Diva Anti-Dandruff Pomade 250ml", 250, "DIV-001", "DIVA|#0A9EBB", "Pomades", 45),
-    (2, "Detrex Pine Drops Soap 110g", 95, "DET-002", "DETREX|#0F766E", "Soaps", 80),
+    (2, "Detrex Pine Drops Soap 110g", 95, "DET-002", "DETREX|#0F766E", "COSMSTICS", 80),
     (3, "Fresh Fri Cooking Oil 2L", 890, "FRE-003", "FRESH FRI|#B45309", "Cooking Oils", 50),
-    (4, "Detrex Citronella Soap 110g", 95, "DET-004", "DETREX|#0F766E", "Soaps", 100),
+    (4, "Detrex Citronella Soap 110g", 95, "DET-004", "DETREX|#0F766E", "COSMSTICS", 100),
     (5, "Sawa Men Lotion 72Hrs", 320, "SAW-005", "SAWA|#1E40AF", "Lotions", 12),
     (6, "Detrex Cool Mint Soap 110g", 95, "DET-006", "DETREX|#0F766E", "Soaps", 4),
     (7, "Diva Anti-Breakage Pomade 250ml", 250, "DIV-007", "DIVA|#0A9EBB", "Pomades", 30),
