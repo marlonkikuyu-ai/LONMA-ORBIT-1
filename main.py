@@ -177,7 +177,7 @@ cur.execute("DELETE FROM products")
 cur.execute("CREATE TABLE IF NOT EXISTS promos (id INTEGER PRIMARY KEY, code TEXT, discount REAL)") 
 cur.execute("DELETE FROM promos")
 cur.execute("INSERT OR IGNORE INTO promos (code, discount) VALUES ('LONMA10',10)")
-cur.execute("INSERT OR IGNORE INTO promos VALUES ('WELCOME20',20)")
+cur.execute("INSERT OR IGNORE INTO promos (code, discount) VALUES ('WELCOME20',20)")
 PRODS = [
     (1, "Diva Anti-Dandruff Pomade 250ml", 250, "DIV-001", "DIVA|#0A9EBB", "Pomades", 45),
     (2, "Detrex Pine Drops Soap 110g", 95, "DET-002", "DETREX|#0F766E", "COSMSTICS", 80),
