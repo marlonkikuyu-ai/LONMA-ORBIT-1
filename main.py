@@ -1071,3 +1071,11 @@ async def forgot_pw(req: Request):
     except Exception as e:
         print("FORGOT ERROR:", e)
         return {"status":"error","message":"Server error: "+str(e)}
+
+@app.get("/community")
+def community_page():
+    try:
+        with open("static/community.html") as f:
+            return HTMLResponse(f.read())
+    except:
+        return HTMLResponse("<h2>Community page not found - upload static/community.html</h2>")
