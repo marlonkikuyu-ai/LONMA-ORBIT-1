@@ -5,6 +5,7 @@ import os, sqlite3, json, datetime, requests, base64, time, re, random, hashlib,
 from threading import Thread
 from collections import defaultdict
 import urllib.parse
+from auth import SESSIONS
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 SMS_API_KEY = os.getenv("SMS_API_KEY", "")
@@ -48,12 +49,9 @@ def google_callback(code: str = ""):
     if not cur.fetchone():
         conn.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)", (email, name, hash_pw(secrets.token_hex(8))))
         conn.commit()
-   import secrets
-from auth import SESSIONS
-
-token = secrets.token_hex(16)
-SESSIONS[token] = {"id": email, "name": name, "email": email, "phone": ""}
-return RedirectResponse(f"/home?token={token}")
+    token = secrets.token_hex(16)
+    SESSIONS[token] = {"id": email, "name": name, "email": email, "phone": ""}
+    return RedirectResponse(f"/home?token={token}")
 
 @app.get("/login.html")
 async def login_page():
