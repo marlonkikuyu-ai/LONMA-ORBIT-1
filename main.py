@@ -732,7 +732,7 @@ async def log(req: Request):
     FAILED[ip] = []
     return {"status": "ok", "user": {"phone": row[0], "name": row[1]}}
 
-HTML="""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>LONMA ORBIT - Online Supermarket</title><style>
+HTML="""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>LONMA ORBIT - <div style="text-align:center;padding:28px 20px 18px;background:#fff"> <div style="width:92px;height:92px;margin:0 auto 14px;border-radius:50%;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.10)"> <img src="/logo.png" style="width:100%;height:100%;object-fit:cover"> </div> <div style="font-size:22px;font-weight:800;letter-spacing:1.5px;color:#0f1e3a">LONMA ORBIT</div> <div style="font-size:13px;color:#8a94a6;margin-top:4px">Nairobi, Kenya</div> <div style="margin:16px auto 0;width:36px;height:3px;background:#00b4c8;border-radius:99px"></div> </div></title><style>
 :root{--teal:#0A9EBB;--dark:#0F172A;--line:#E2E8F0;--muted:#64748B;--bg:#F8FAFC;--card:#FFFFFF;--text:#0F172A}*{box-sizing:border-box}body{margin:0;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
 body.dark{--bg:#0F172A;--card:#1E293B;--text:#F8FAFC;--line:#334155;--muted:#94A3B8}
 body.dark .nav,body.dark .side,body.dark .bottom,body.dark .card,body.dark .statbox{ background:#1E293B !important; color:#F8FAFC !important; border-color:#334155 !important}
