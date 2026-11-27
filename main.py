@@ -238,6 +238,80 @@ def get_posts(phone: str = ""):
             liked = cur2.fetchone() is not None
         out.append({"id": r[0], "author": r[1], "phone": r[2], "text": r[3], "image": r[4], "likes": r[5], "reposts": r[6], "created": r[7], "comments": cc, "liked": liked})
     return out
+# --- FRIENDS / PHOTOS / LIVE ---
+# Follows stored in DB so they survive redeploy
+try:
+    conn.execute("CREATE TABLE IF NOT EXISTS community_follows (follower TEXT, following TEXT, UNIQUE(follower, following))")
+    conn.commit()
+except Exception as e:
+    print("follows table:", e)
+
+LIVE_ROOMS = {}
+
+@app.post("/api/friends/follow")
+def follow_friend(data: dict):
+    me = data.get("phone"); target = data.get("target_phone")
+    if not me or not target or me == target:
+        return {"ok": False}
+    cur = conn.cursor()
+    cur.execute("SELECT 1 FROM community_follows WHERE follower=? AND following=?", (me, target))
+    if cur.fetchone():
+        cur.execute("DELETE FROM community_follows WHERE follower=? AND following=?", (me, target))
+        conn.commit()
+        return {"ok": True, "following": False}
+    cur.execute("INSERT INTO community_follows (follower, following) VALUES (?,?)", (me, target))
+    conn.commit()
+    return {"ok": True, "following": True}
+
+@app.get("/api/friends/feed")
+def friends_feed(phone: str = ""):
+    cur = conn.cursor()
+    cur.execute("SELECT following FROM community_follows WHERE follower=?", (phone,))
+    following = [r[0] for r in cur.fetchall()]
+    if not following:
+        return []
+    q = ",".join("?" for _ in following)
+    cur.execute(f"SELECT id,author,phone,text,image,likes,reposts,created FROM community_posts WHERE phone IN ({q}) ORDER BY id DESC LIMIT 50", following)
+    return [{"id": r[0], "author": r[1], "phone": r[2], "text": r[3], "image": r[4], "likes": r[5], "reposts": r[6], "created": r[7]} for r in cur.fetchall()]
+
+@app.get("/api/community/photos")
+def photos_feed():
+    cur = conn.cursor()
+    cur.execute("SELECT id,author,phone,text,image,likes,reposts,created FROM community_posts WHERE image IS NOT NULL AND image != '' ORDER BY id DESC LIMIT 100")
+    return [{"id": r[0], "author": r[1], "phone": r[2], "text": r[3], "image": r[4], "likes": r[5], "reposts": r[6], "created": r[7]} for r in cur.fetchall()]
+
+# --- LIVE ---
+@app.post("/api/live/create")
+def live_create(data: dict):
+    import uuid, time
+    rid = uuid.uuid4().hex[:8]
+    LIVE_ROOMS[rid] = {"id": rid, "host": data.get("phone"), "title": data.get("title", "Live"), "viewers": 0, "chat": [], "created": time.time(), "live": True}
+    return {"ok": True, "room": LIVE_ROOMS[rid]}
+
+@app.get("/api/live/list")
+def live_list():
+    return [r for r in LIVE_ROOMS.values() if r["live"]]
+
+@app.post("/api/live/join/{rid}")
+def live_join(rid: str):
+    if rid in LIVE_ROOMS:
+        LIVE_ROOMS[rid]["viewers"] += 1
+        return {"ok": True, "room": LIVE_ROOMS[rid]}
+    return {"ok": False}
+
+@app.post("/api/live/chat/{rid}")
+def live_chat(rid: str, data: dict):
+    if rid in LIVE_ROOMS:
+        LIVE_ROOMS[rid]["chat"].append({"phone": data.get("phone"), "name": data.get("name", ""), "text": data.get("text", "")})
+        return {"ok": True}
+    return {"ok": False}
+
+@app.post("/api/live/end/{rid}")
+def live_end(rid: str):
+    if rid in LIVE_ROOMS:
+        LIVE_ROOMS[rid]["live"] = False
+    return {"ok": True}
+
 
 @app.post("/api/community/post")
 async def create_post(req: Request):
