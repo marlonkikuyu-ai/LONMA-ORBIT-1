@@ -5,19 +5,50 @@ import os, sqlite3, json, datetime, requests, base64, time, re, random, hashlib,
 from threading import Thread
 from collections import defaultdict
 import urllib.parse
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "648502618142-9thjq2hi7kupj...apps.googleusercontent.com")
-GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "GOCSPX-...")
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+SMS_API_KEY = os.getenv("SMS_API_KEY", "")
+AT_API_KEY = os.getenv("AT_API_KEY", "")
 GOOGLE_REDIRECT_URI = "https://app.lonmaorbit.co.ke/auth/callback"
-
 app = FastAPI()
 DB_PATH = os.path.join(os.path.dirname(__file__), "lonma.db")
 @app.get("/auth/google")
 def google_login():
-    ...
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "consent"
+    }
+    url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+    return RedirectResponse(url)
 
 @app.get("/auth/callback")
 def google_callback(code: str = ""):
-    ...
+    if not code:
+        return RedirectResponse("/login.html?error=no_code")
+    r = requests.post("https://oauth2.googleapis.com/token", data={
+        "code": code,
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "grant_type": "authorization_code"
+    }, timeout=10)
+    data = r.json()
+    id_token = data.get("id_token", "")
+    u = requests.get("https://oauth2.googleapis.com/tokeninfo?id_token=" + id_token, timeout=10).json()
+    email = u.get("email", "")
+    name = u.get("name", "Customer")
+    if not email:
+        return RedirectResponse("/login.html?error=google_failed")
+    cur = conn.cursor()
+    cur.execute("SELECT phone FROM users WHERE phone=?", (email,))
+    if not cur.fetchone():
+        conn.execute("INSERT INTO users (phone,name,password) VALUES (?,?,?)", (email, name, hash_pw(secrets.token_hex(8))))
+        conn.commit()
+    return RedirectResponse(f"/home?google_user={urllib.parse.quote(email)}&name={urllib.parse.quote(name)}")
 
 @app.get("/login.html")
 async def login_page():
