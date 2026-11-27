@@ -38,6 +38,7 @@ def google_callback(code: str = ""):
         "grant_type": "authorization_code"
     }, timeout=10)
     data = r.json()
+    print("GOOGLE TOKEN DATA:", data)
     id_token = data.get("id_token", "")
     u = requests.get("https://oauth2.googleapis.com/tokeninfo?id_token=" + id_token, timeout=10).json()
     email = u.get("email", "")
