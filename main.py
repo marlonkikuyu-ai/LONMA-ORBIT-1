@@ -570,7 +570,7 @@ async def stk(req: Request):
 @app.post("/airtel/stkpush")
 async def airtel_push(req: Request):
     if not AIRTEL_KEY or not AIRTEL_SECRET:
-        return {"status": "error", "message": "Airtel Money is temporarily unavailable. Please use M-Pesa."}
+        return {"status": "error", "message": " is temporarily unavailable. Please use M-Pesa."}
     d = await req.json()
     raw = clean_input(d.get('phone', ''), 15)
     phone = raw.replace(" ", "").replace("+254", "0")
@@ -587,7 +587,7 @@ async def airtel_push(req: Request):
     name = clean_input(d.get('name', 'Guest'), 50)
     area = clean_input(d.get('area', ''), 20)
     loc = clean_input(d.get('location', ''), 100)
-    save_order(order_no, name, raw, area, loc, d.get('cart', []), amount, 'Airtel Money')
+    save_order(order_no, name, raw, area, loc, d.get('cart', []), amount, '')
     return {"status": "ok", "message": f"Airtel Money prompt sent to {raw}. Check phone and enter PIN. Order {order_no}", "order_no": order_no}
 
 @app.post("/card/pay")
