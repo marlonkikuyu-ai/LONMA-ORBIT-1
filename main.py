@@ -228,7 +228,7 @@ def health():
     return {"status": "ok", "mpesa_env": "production" if USE_PROD else "sandbox", "mpesa_configured": bool(DARAJA_KEY and DARAJA_PASSKEY), "airtel_configured": bool(AIRTEL_KEY), "card_configured": bool(STRIPE_KEY), "sms_configured": bool(SMS_API_KEY or AT_API_KEY), "show_reset_code": SHOW_RESET_CODE}
 
 @app.get("/api/community/posts")
-def get_posts(phone: str = ""):
+@app.get("/api/community/posts") def get_posts():     conn = sqlite3.connect(DB)     conn.row_factory = sqlite3.Row     cur = conn.cursor()     cur.execute("PRAGMA table_info(community_posts)")     cols = [r[1] for r in cur.fetchall()]     if "author" not in cols:         try:             cur.execute("ALTER TABLE community_posts ADD COLUMN author TEXT DEFAULT 'User'")             conn.commit()             cols.append("author")         except Exception:             pass     cur.execute("PRAGMA table_info(community_posts)")     cols = [r[1] for r in cur.fetchall()]     want = ["id", "author", "phone", "text", "image", "likes", "reposts", "created"]     have = [c for c in want if c in cols]     cur.execute(f"SELECT {','.join(have)} FROM community_posts ORDER BY id DESC LIMIT 50")     rows = [dict(r) for r in cur.fetchall()]     for r in rows:         if "author" not in r:             r["author"] = r.get("phone", "User")         if "likes" not in r:             r["likes"] = 0         if "reposts" not in r:             r["reposts"] = 0     conn.close()     return rows(phone: str = ""):
     cur = conn.cursor()
     cur.execute("SELECT id,author,phone,text,image,likes,reposts,created FROM community_posts ORDER BY id DESC LIMIT 50")
     out = []
