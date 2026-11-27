@@ -174,7 +174,8 @@ try:
 except Exception:
     pass
 cur.execute("DELETE FROM products")
-cur.execute("CREATE TABLE IF NOT EXISTS promos (id INTEGER PRIMARY KEY, code TEXT, discount REAL)") cur.execute("DELETE FROM promos")
+cur.execute("CREATE TABLE IF NOT EXISTS promos (id INTEGER PRIMARY KEY, code TEXT, discount REAL)") 
+cur.execute("DELETE FROM promos")
 cur.execute("INSERT OR IGNORE INTO promos VALUES ('LONMA10',10)")
 cur.execute("INSERT OR IGNORE INTO promos VALUES ('WELCOME20',20)")
 PRODS = [
