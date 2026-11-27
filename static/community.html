@@ -1,28 +1,96 @@
-<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Community - Lonma Orbit</title><style>body{font-family:system-ui;margin:0;background:#fff7ed}header{background:#ea580c;color:#fff;padding:14px;font-weight:800} .tabs{display:flex;gap:8px;padding:12px;overflow:auto} .tab{padding:10px 16px;border-radius:999px;border:1px solid #fed7aa;background:#fff;white-space:nowrap} .tab.active{background:#ea580c;color:#fff} .box{padding:12px} .card{background:#fff;border:1px solid #eee;border-radius:12px;padding:12px;margin-bottom:10px} button{background:#ea580c;color:#fff;border:0;padding:8px 14px;border-radius:8px} input{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin:6px 0} a{color:#ea580c}</style></head><body>
-<header>🧡 Lonma Orbit - Community</header>
+<!DOCTYPE html>
+<html><head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Community - Lonma Orbit</title>
+<style>
+body{font-family:system-ui;margin:0;background:#fff7ed}
+header{background:#ea580c;color:#fff;padding:14px;font-weight:800;display:flex;justify-content:space-between;align-items:center}
+header a{color:#fff;text-decoration:none;font-size:13px;background:rgba(255,255,255,.25);padding:6px 10px;border-radius:999px}
+.tabs{display:flex;gap:8px;padding:12px;overflow:auto;background:#fff;position:sticky;top:0}
+.tab{padding:10px 16px;border-radius:999px;border:1px solid #fed7aa;background:#fff;white-space:nowrap;cursor:pointer}
+.tab.active{background:#ea580c;color:#fff}
+.box{padding:12px}
+.card{background:#fff;border:1px solid #eee;border-radius:12px;padding:12px;margin-bottom:10px}
+button{background:#ea580c;color:#fff;border:0;padding:8px 14px;border-radius:8px;cursor:pointer}
+button.sec{background:#fff;color:#ea580c;border:1px solid #fed7aa}
+input,textarea,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;margin:6px 0;box-sizing:border-box}
+img.postimg{width:100%;border-radius:12px;margin-top:8px}
+.badge{background:#dc2626;color:#fff;border-radius:999px;padding:2px 7px;font-size:11px}
+.chatbox{height:220px;overflow:auto;background:#fff7ed;border:1px solid #eee;border-radius:8px;padding:8px}
+</style></head><body>
+<header><span>🧡 Lonma Orbit - Community</span><a href="/home">← Home</a></header>
+
 <div class="tabs">
 <button class="tab active" onclick="show('feed',this)">📝 Feed</button>
 <button class="tab" onclick="show('friends',this)">👥 Friends</button>
 <button class="tab" onclick="show('photos',this)">📸 Photos</button>
 <button class="tab" onclick="show('live',this)">🔴 Live</button>
+<button class="tab" onclick="show('notif',this)">🔔 Notif <span id="notifCount" class="badge" style="display:none">0</span></button>
 </div>
+
 <div class="box">
-<div id="feed"><div class="card"><b>Community Feed</b><p>Share deals, recipes, reviews.</p><input id="postText" placeholder="What's happening?"><button onclick="postIt()">Post</button><div id="posts"></div></div></div>
-<div id="friends" style="display:none"><div class="card"><b>Find Friends</b><input id="searchQ" placeholder="Search by phone / name"><button onclick="searchFriends()">Search</button><div id="friendList"></div></div><div class="card"><b>My Friends Feed</b><button onclick="loadFriendsFeed()">Load My Friends Feed</button><div id="friendsFeed"></div></div></div>
-<div id="photos" style="display:none"><div class="card"><b>Photos</b><p>Photos from community posts will appear here.</p><div id="photosList"></div></div></div>
-<div id="live" style="display:none"><div class="card"><b>🔴 Live Rooms</b><input id="roomName" placeholder="Room name e.g. Morning Deals"><button onclick="createRoom()">Start Live Room</button><div id="rooms"></div></div></div>
-<p><a href="/home">← Back to Home</a></p>
+<!-- FEED -->
+<div id="feed">
+<div class="card"><b>Share a Deal / Recipe / Review</b>
+<textarea id="postText" placeholder="What's happening? Share a deal..."></textarea>
+<input type="file" id="postPhoto" accept="image/*">
+<button onclick="postIt()">Post</button></div>
+<div id="posts"></div></div>
+
+<!-- FRIENDS -->
+<div id="friends" style="display:none">
+<div class="card"><b>Find Friends</b>
+<input id="searchQ" placeholder="Search by phone / name">
+<button onclick="searchFriends()">Search</button><div id="friendList"></div></div>
+<div class="card"><b>My Friends Feed</b>
+<button class="sec" onclick="loadFriendsFeed()">Load My Friends Feed</button><div id="friendsFeed"></div></div></div>
+
+<!-- PHOTOS -->
+<div id="photos" style="display:none"><div class="card"><b>📸 Community Photos</b><div id="photosList"></div></div></div>
+
+<!-- LIVE -->
+<div id="live" style="display:none">
+<div class="card"><b>🔴 Live Rooms</b>
+<input id="roomName" placeholder="Room name e.g. Morning Deals">
+<button onclick="createRoom()">Start Live Room</button><div id="rooms"></div></div>
+<div class="card" id="liveRoomBox" style="display:none"><b id="liveRoomTitle">Live Room</b>
+<div class="chatbox" id="chatBox"></div>
+<input id="chatMsg" placeholder="Type message...">
+<button onclick="sendChat()">Send</button>
+<button class="sec" onclick="leaveRoom()">Leave</button></div></div>
+
+<!-- NOTIF -->
+<div id="notif" style="display:none"><div class="card"><b>🔔 Notifications</b><button class="sec" onclick="loadNotif()">Refresh</button><div id="notifList"></div></div></div>
 </div>
+
 <script>
 const phone = localStorage.getItem('phone') || new URLSearchParams(location.search).get('phone') || '0707780807';
-function show(id,btn){['feed','friends','photos','live'].forEach(x=>document.getElementById(x).style.display=x===id?'block':'none');document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active'); if(id==='feed')loadPosts(); if(id==='live')loadRooms();}
-async function loadPosts(){let r=await fetch('/api/community/posts?phone='+phone);let j=await r.json();let list=j.posts||j||[];document.getElementById('posts').innerHTML=list.map(p=>`<div class="card"><b>${p.name||p.phone||'User'}</b><p>${p.content||p.text||''}</p><button onclick="follow('${p.phone}')">+ Follow</button></div>`).join('')||'No posts yet';let ph=list.filter(p=>p.image_url||p.photo);document.getElementById('photosList').innerHTML=ph.map(p=>`<img src="${p.image_url||p.photo}" style="width:100%;border-radius:12px;margin-bottom:8px">`).join('')||'No photos yet';}
-async function postIt(){let t=document.getElementById('postText').value;if(!t)return alert('Type something');await fetch('/api/community/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,content:t})});document.getElementById('postText').value='';loadPosts();}
-async function follow(p){await fetch('/api/friends/follow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,friend_phone:p})});alert('Followed!');}
-async function searchFriends(){let q=document.getElementById('searchQ').value;let r=await fetch('/api/friends/search?q='+encodeURIComponent(q)+'&phone='+phone);let j=await r.json();let list=j.users||j.results||[];document.getElementById('friendList').innerHTML=list.map(u=>`<div class="card"><b>${u.name||u.phone}</b> <button onclick="follow('${u.phone}')">+ Follow</button></div>`).join('')||'No users found';}
-async function loadFriendsFeed(){let r=await fetch('/api/friends/feed?phone='+phone);let j=await r.json();let list=j.posts||j.feed||[];document.getElementById('friendsFeed').innerHTML=list.map(p=>`<div class="card"><b>${p.name||p.phone}</b><p>${p.content||''}</p></div>`).join('')||'No friends posts yet';}
-async function loadRooms(){let r=await fetch('/api/live/rooms');let j=await r.json();let list=j.rooms||[];document.getElementById('rooms').innerHTML=list.map(x=>`<div class="card"><b>${x.title||x.name}</b> - ${x.host||''} <button onclick="joinRoom('${x.id}')">Join</button></div>`).join('')||'No live rooms - start one!';}
-async function createRoom(){let t=document.getElementById('roomName').value||'Live Room';await fetch('/api/live/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,title:t})});loadRooms();}
-async function joinRoom(id){alert('Joined room '+id+' - Live chat coming soon!');}
-loadPosts();
+let currentRoom = null, chatTimer = null;
+function show(id,btn){['feed','friends','photos','live','notif'].forEach(x=>document.getElementById(x).style.display=x==='feed'&&id==='feed'?'block':x===id?'block':'none');document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(id==='feed')loadPosts();if(id==='live')loadRooms();if(id==='notif')loadNotif();}
+async function loadPosts(){
+  let r=await fetch('/api/community/posts?phone='+phone);let j=await r.json().catch(()=>({}));
+  let list=j.posts||j||[]; if(!Array.isArray(list)) list=[];
+  document.getElementById('posts').innerHTML=list.map(p=>`<div class="card"><b>${p.name||p.phone||'User'}</b> <small>${p.created_at||''}</small><p>${(p.content||p.text||'').replace(/</g,'&lt;')}</p>${p.image_url||p.photo?`<img class="postimg" src="${p.image_url||p.photo}">`:''}<br><button onclick="follow('${p.phone}')">+ Follow</button> <button class="sec" onclick="likePost('${p.id}')">❤️ Like (${p.likes||0})</button></div>`).join('')||'No posts yet - be first!';
+  let ph=list.filter(p=>p.image_url||p.photo);
+  document.getElementById('photosList').innerHTML=ph.map(p=>`<img class="postimg" src="${p.image_url||p.photo}"><p><b>${p.name||p.phone}</b> - ${p.content||''}</p>`).join('')||'No photos yet';
+}
+async function postIt(){
+  let t=document.getElementById('postText').value; if(!t) return alert('Type something');
+  let file=document.getElementById('postPhoto').files[0]; let photo='';
+  if(file){ photo=await new Promise(res=>{let r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(file);}); }
+  await fetch('/api/community/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,content:t,photo,image_url:photo})});
+  document.getElementById('postText').value=''; document.getElementById('postPhoto').value=''; loadPosts(); alert('Posted!');
+}
+async function likePost(id){ await fetch('/api/community/like',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,post_id:id})}); loadPosts(); }
+async function follow(p){ await fetch('/api/friends/follow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,friend_phone:p})}); alert('Followed!'); }
+async function searchFriends(){ let q=document.getElementById('searchQ').value; let r=await fetch('/api/friends/search?q='+encodeURIComponent(q)+'&phone='+phone); let j=await r.json().catch(()=>({})); let list=j.users||j.results||[]; document.getElementById('friendList').innerHTML=list.map(u=>`<div class="card"><b>${u.name||u.phone}</b><br><button onclick="follow('${u.phone}')">+ Follow</button></div>`).join('')||'No users found'; }
+async function loadFriendsFeed(){ let r=await fetch('/api/friends/feed?phone='+phone); let j=await r.json().catch(()=>({})); let list=j.posts||j.feed||[]; document.getElementById('friendsFeed').innerHTML=list.map(p=>`<div class="card"><b>${p.name||p.phone}</b><p>${p.content||''}</p></div>`).join('')||'No friends posts yet'; }
+async function loadRooms(){ let r=await fetch('/api/live/rooms'); let j=await r.json().catch(()=>({})); let list=j.rooms||[]; document.getElementById('rooms').innerHTML=list.map(x=>`<div class="card"><b>${x.title||x.name}</b> - ${x.host||''}<br><button onclick="joinRoom('${x.id}','${(x.title||'Live Room').replace(/'/g,'')}')">Join Live</button></div>`).join('')||'No live rooms - start one!'; }
+async function createRoom(){ let t=document.getElementById('roomName').value||'Live Room'; let r=await fetch('/api/live/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,title:t})}); let j=await r.json().catch(()=>({})); let id=j.id||j.room_id||Date.now().toString(); joinRoom(id,t); loadRooms(); }
+function joinRoom(id,title){ currentRoom=id; document.getElementById('liveRoomBox').style.display='block'; document.getElementById('liveRoomTitle').innerText='🔴 LIVE: '+title; loadChat(); clearInterval(chatTimer); chatTimer=setInterval(loadChat,3000); }
+function leaveRoom(){ currentRoom=null; clearInterval(chatTimer); document.getElementById('liveRoomBox').style.display='none'; }
+async function loadChat(){ if(!currentRoom) return; let r=await fetch('/api/live/chat?room_id='+currentRoom); let j=await r.json().catch(()=>({})); let list=j.messages||[]; document.getElementById('chatBox').innerHTML=list.map(m=>`<div><b>${m.phone||m.name}:</b> ${m.text||m.message}</div>`).join(''); document.getElementById('chatBox').scrollTop=9999; }
+async function sendChat(){ let t=document.getElementById('chatMsg').value; if(!t||!currentRoom) return; await fetch('/api/live/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,room_id:currentRoom,text:t})}); document.getElementById('chatMsg').value=''; loadChat(); }
+async function loadNotif(){ let r=await fetch('/api/notifications?phone='+phone); let j=await r.json().catch(()=>({})); let list=j.notifications||j||[]; if(!Array.isArray(list)) list=[]; document.getElementById('notifList').innerHTML=list.map(n=>`<div class="card">${n.message||n.text||JSON.stringify(n)}</div>`).join('')||'No notifications yet'; document.getElementById('notifCount').style.display=list.length?'inline':'none'; document.getElementById('notifCount').innerText=list.length; }
+loadPosts(); loadNotif(); setInterval(loadNotif,15000);
 </script></body></html>
