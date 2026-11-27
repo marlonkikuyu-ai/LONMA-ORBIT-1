@@ -190,7 +190,11 @@ PRODS = [
 ]
 for pid, name, price, code, img, cat, stock in PRODS:
     cur.execute("INSERT INTO products VALUES (?,?,?,?,?,?,?)", (pid, name, price, code, img, cat, stock))
-cur.execute("DELETE FROM community_posts")
+try:
+    cur.execute("CREATE TABLE IF NOT EXISTS community_posts (id TEXT, phone TEXT, content TEXT, photo TEXT, likes INTEGER DEFAULT 0, created_at TEXT)")
+    cur.execute("DELETE FROM community_posts")
+except Exception as e:
+    print("community_posts fix:", e)
 cur.execute("DELETE FROM community_comments")
 cur.execute("DELETE FROM community_likes")
 conn.commit()
